@@ -1,37 +1,35 @@
 # rallyr
 
-`rallyr`'s value is not any particular data source — it's what happens
-**after** raw per-shot tennis data lands in a tidy table: splitting
-unreasonably long rallies back into the real ones a sensor/export
-sometimes merges, flagging and correcting data-quality issues, computing
-standardised per-session effort and performance metrics, and (planned)
-visualising all of it in a dashboard. Today the only supported source is
-the [SwingVision](https://www.swingvision.com/) app (its public share-link
-API, or a raw copy-pasted match/rally page) — that is expected to change,
-so the parsing layer is kept separate from the transform/metrics layer it
-feeds, deliberately, rather than assuming SwingVision is the only source
-this package will ever need. It ships with a synthetic sample dataset, so
-the quick-start example below runs with no real session data of any kind.
+Turns raw per-shot tennis data into a tidy table of splits, corrections,
+and metrics:
+
+- **Splits** unreasonably long rallies back into the real ones a
+  sensor/export sometimes merges.
+- **Flags and corrects** data-quality issues.
+- **Computes** standardised per-session effort and performance metrics.
+- **Visualises** it all in a dashboard (planned).
+
+Today the only supported source is the
+[SwingVision](https://www.swingvision.com/) app (its public share-link API,
+or a raw copy-pasted match/rally page) — that is expected to change, so the
+parsing layer is kept separate from the transform/metrics layer it feeds,
+deliberately, rather than assuming SwingVision is the only source this
+package will ever need. It ships with a synthetic sample dataset, so the
+quick-start example below runs with no real session data of any kind.
 
 ## Installation
 
-Not yet published. Once published:
+Public on GitHub: <https://github.com/JohnGavin/rallyr>
 
 ```r
 # install.packages("pak")
-pak::pak("owner/rallyr")
+pak::pak("JohnGavin/rallyr")
 ```
 
 ## Quick start
 
-Generate the bundled synthetic sample database (run once, from the package
-root):
-
-```r
-Rscript data-raw/generate_sample.R
-```
-
-Then explore it:
+The package ships with a bundled synthetic sample database — nothing to
+generate first:
 
 ```r
 library(rallyr)
@@ -87,7 +85,8 @@ Recorded 2026-09-04, not yet implemented:
 - **A dashboard vignette populated with simulated data**, built entirely
   on the bundled synthetic sample database — demonstrating the
   transform/metrics/visualisation value this package actually provides,
-  not just its data layer.
+  not just its data layer. Planning issue:
+  [rallyr#1](https://github.com/JohnGavin/rallyr/issues/1).
 
 ## Disclaimer
 
@@ -98,8 +97,7 @@ It is **not affiliated with, nor endorsed by, SwingVision, in any way.**
 
 ## Status
 
-This is an early-stage template/skeleton package, extracted from a private
-personal project. Not yet ready for general use — see the package's
-development notes for what's still missing before a first release
-(real author metadata, a versioning policy, CI, full generated
-documentation, a public source repository).
+This is an early-stage package, extracted from a private personal project.
+Source is public (<https://github.com/JohnGavin/rallyr>) but not yet ready
+for general use — still missing before a first release: real author
+metadata, a versioning policy, CI, and full generated documentation.
