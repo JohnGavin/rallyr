@@ -11,34 +11,34 @@ and metrics:
 
 Today the only supported source is the
 [SwingVision](https://www.swingvision.com/) app (its public share-link API,
-or a raw copy-pasted match/rally page) — that is expected to change, so the
-parsing layer is kept separate from the transform/metrics layer it feeds,
-deliberately, rather than assuming SwingVision is the only source this
-package will ever need. It ships with a synthetic sample dataset, so the
+or a raw copy-pasted match/rally page). The parsing layer is kept separate
+from the transform/metrics layer it feeds, so a future source would only
+need a new parser producing the same tidy shape — not a rewrite of the
+transform layer itself. It ships with a synthetic sample dataset, so the
 quick-start example below runs with no real session data of any kind.
 
 ## Input
 
-The only thing you provide is a **SwingVision share URL** (or bare token)
-for one recorded session — everything else is derived from that single
-source. `fetch_swingvision()` pulls session-aggregate stats,
-`fetch_swingvision_shots()` pulls the per-shot detail, and every other
-function (rally splitting, data-quality flags, drill-phase segmentation,
-effort metrics) transforms what those two calls returned. There is no other
-data entry point.
+- One **SwingVision share URL** (or bare token) — e.g.
+  `https://swing.vision/matches/sw2-K4mQrXz9F` — for one recorded session.
+  That's the only thing you provide.
+- Everything else is derived from it: `fetch_swingvision()` pulls
+  session-aggregate stats, `fetch_swingvision_shots()` pulls per-shot
+  detail, and every other function (rally splitting, data-quality flags,
+  drill-phase segmentation, effort metrics) transforms what those two calls
+  returned.
+- No other data entry point.
 
-**Built for structured hitting/rally drills, not scored matches.** The
-drill-phase detector (`segment_session_shots()`), and anything conditioned
-on its output, was designed for and calibrated against cooperative practice
-sessions with distinct drill phases (e.g. a mini-tennis warm-up, net
-volleying, cross-court rallies) — not competitive matches with serves,
-points, and side-changes. Its default thresholds come from **one** real
-drill routine; treat them as a worked example to recalibrate for your own
-drills, not a universal setting. If the recorded session is an ordinary
-match rather than a drill session, the drill-phase breakdown — and any
-metric derived from it — may not mean anything; session- and shot-level
-stats (`fetch_swingvision()`, rally splitting, data-quality flags) still
-apply regardless of whether the session was a drill or a match.
+**Built for structured hitting/rally drills, not scored matches:**
+
+- `segment_session_shots()`'s default thresholds were calibrated against
+  **one** real drill routine (mini-tennis warm-up, net volleying,
+  cross-court rallies) — treat them as a worked example to recalibrate for
+  your own drills, not a universal setting.
+- Recorded an ordinary scored match instead? The drill-phase breakdown —
+  and anything derived from it — may not mean anything.
+- Session- and shot-level stats (`fetch_swingvision()`, rally splitting,
+  data-quality flags) still apply either way.
 
 ## Installation
 
