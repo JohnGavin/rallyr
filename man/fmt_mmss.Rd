@@ -15,7 +15,7 @@ becomes \code{"-"}.}
 A character vector, e.g. \code{"7m 30s"}, \code{"0m 06s"}.
 }
 \description{
-Single source of truth for drill-duration display (ISSUES.md #40 -- "how
+Single source of truth for drill-duration display (issue #40 -- "how
 long each drill lasts in minutes and seconds", not decimal minutes like
 "7.5"). Used as a \verb{scale_*_continuous(labels = fmt_mmss)} axis formatter
 in \code{scripts/make_artifact_charts.R}'s duration charts, and available for

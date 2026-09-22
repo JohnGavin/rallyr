@@ -14,7 +14,7 @@ A tibble with \code{session_date}, \code{metric}, \code{label}, \code{pct}, \cod
 (direction-adjusted percentile) and \code{rank} (1 = best that session).
 }
 \description{
-The input for the bump chart (ISSUES.md #32): within each session, the
+The input for the bump chart (issue #32): within each session, the
 directional metrics from \code{\link[=session_standard_metrics]{session_standard_metrics()}} are ranked by their
 percentile, so rank 1 is the aspect that session was strongest on relative
 to the player's own history. Lines joining one metric's rank across

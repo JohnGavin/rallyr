@@ -17,19 +17,19 @@ A tibble, one row per shot, sorted by \code{started_at} ascending.
 Pure function over an already-fetched JSON list (no network) so it is unit
 testable against committed fixtures. \code{spin_type} is categorical (e.g.
 \code{flat}/\code{topspin}/\code{slice}) -- there is no numeric spin-rate field in this
-endpoint (see \code{ISSUES.md} #1).
+endpoint (see issue #1).
 }
 \details{
 \code{shot_in} is derived from \code{net_type}/\code{bounce_location_long}/
 \code{bounce_location_lat} (see \code{\link[=sv_shot_in]{sv_shot_in()}}) -- the \verb{/shots} payload has no
-explicit in/out flag. Validated live against \code{sw2-a72NHHc}'s known
+explicit in/out flag. Validated live against \code{sw2-EXAMPLE01}'s known
 session-level accuracy (\verb{/stats} endpoint: 589/714 = 82.5\%): the
 bounce/net-derived rate came out 83.6\% (597/714) -- close but not exact,
 so treat \code{shot_in} as directionally reliable per-shot signal, not a
 bit-exact reproduction of the \verb{/stats} endpoint's own count.
 
 \code{rally_id} is the payload's own \code{pid} field, taken as-is (not derived).
-Verified live against \code{sw2-a72NHHc}: sorted by \code{started_at}, every \code{pid}
+Verified live against \code{sw2-EXAMPLE01}: sorted by \code{started_at}, every \code{pid}
 value forms one contiguous run of shots -- SwingVision already segments
 the match into points/rallies itself, so this does not need a time-gap
 heuristic. \code{rally_id} is unique only \emph{within} a \code{match_id}, not globally

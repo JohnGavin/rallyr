@@ -7,8 +7,8 @@
 sv_token(x)
 }
 \arguments{
-\item{x}{A share URL like \verb{https://swing.vision/matches/sw2-a72NHHc} or a
-bare token like \code{sw2-a72NHHc}.}
+\item{x}{A share URL like \verb{https://swing.vision/matches/sw2-EXAMPLE01} or a
+bare token like \code{sw2-EXAMPLE01}.}
 }
 \value{
 The token string.

@@ -18,10 +18,10 @@ user tables yet.
 \description{
 Returns table and column names/types from DuckDB's
 \code{information_schema.columns}, with zero relationship to row count or row
-values. Safe to publish alongside a public package template (ISSUES.md
+values. Safe to publish alongside a public package template (the issue tracker
 #9/#31) even though \code{con} may point at the real, private \code{tennis.duckdb}
 — the return carries only column definitions, never a data value or a
 count of rows. Also the natural building block for a derived-data API
-(ISSUES.md #44), since a consumer of that API needs to know the shape of
+(issue #44), since a consumer of that API needs to know the shape of
 what it can query before querying it.
 }

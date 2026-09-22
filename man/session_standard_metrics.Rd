@@ -17,7 +17,7 @@ A long tibble, one row per session-metric: \code{session_date},
 (0-100 percentile of \code{value} within that metric across sessions).
 }
 \description{
-ISSUES.md #32: the tracked session metrics are raw totals in incompatible
+issue #32: the tracked session metrics are raw totals in incompatible
 units (strokes, miles, mph, minutes), so a longer session scores higher on
 most of them for no reason other than being longer. This function fixes the
 unit problem in two steps, deliberately kept separate because they answer
@@ -46,7 +46,7 @@ separate rather than collapsing them.
 one. \code{direction} is \code{1} where higher is better, \code{-1} where lower is better,
 and \code{NA} for descriptive metrics with no defensible direction — forehand
 share is the case in point: an unusually forehand-heavy session is a fact
-about the drill (ISSUES.md #3), not an achievement. \code{NA}-direction metrics
+about the drill (issue #3), not an achievement. \code{NA}-direction metrics
 are returned, so they can still be read and plotted, but \code{\link[=session_metric_ranks]{session_metric_ranks()}}
 excludes them from the ranking rather than silently implying they are good.
 }

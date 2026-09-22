@@ -17,17 +17,17 @@ Centralises every magic-number threshold used to flag implausible rows
 many strokes to plausibly be one continuous point) so they live in one
 place instead of scattered across chart-generation code, and so they can
 be recalibrated deliberately as more sessions accumulate. See
-\code{ISSUES.md} #5.
+issue #5.
 }
 \details{
 \code{max_rally_strokes} is a \emph{named list}, not a single number: \code{mini_tennis}
 is a deliberately slow, cooperative warm-up phase where a long
-continuous rally is genuinely plausible (see ISSUES.md #3/#4's review of
+continuous rally is genuinely plausible (see issue #3/#4's review of
 the 14 rallies already found above the \emph{original} default-regime
 threshold of 50 strokes — 12 of 14 were \code{mini_tennis}), so it gets its
 own, higher threshold. Every other regime uses \code{default}.
 
-\strong{Tightened 2026-09-01 (ISSUES.md #14 and #28 reopened #14 again): 50/60
+\strong{Tightened 2026-09-01 (issue #14 and #28 reopened #14 again): 50/60
 -> 40/50.} The original 50/60 pair was set from the \emph{first} pass at
 \code{split_flagged_rallies()} (its gap-threshold pass only), which at the
 time found no qualifying gap in the data and so never actually resolved
@@ -56,7 +56,7 @@ altered, or excluded from the underlying \code{tennis.duckdb} tables. Only
 chart-level \emph{display} filtering (with an explicit on-chart note of how
 many rows were excluded and why) may skip a flagged row.
 
-\code{max_stroke_gap_sec} (ISSUES.md #14, corrected #42) is the threshold
+\code{max_stroke_gap_sec} (issue #14, corrected #42) is the threshold
 \code{\link[=find_rally_splits]{find_rally_splits()}} uses to propose a split of an over-long,
 \code{pid}-grouped rally at a pause independently plausible as a real break in
 play.

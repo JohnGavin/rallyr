@@ -27,7 +27,7 @@ best-effort sub-rallies) is still implausible after correction. No row
 in the output exceeds its own regime's \code{max_rally_strokes} threshold.
 }
 \description{
-Single source of truth for "which rallies may feed a chart" (ISSUES.md
+Single source of truth for "which rallies may feed a chart" (the issue tracker
 #28, reopening #14 again): every rally-derived chart in
 \code{scripts/make_artifact_charts.R} reads from this function's output
 instead of the raw \code{rallies} table, so an implausible outlier (too many

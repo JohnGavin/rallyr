@@ -54,7 +54,7 @@ proposes a split in \strong{two passes}:
 \item \strong{Gap-threshold pass} — \code{\link[=find_rally_splits]{find_rally_splits()}} against the
 calibrated \code{params$max_stroke_gap_sec} (a genuine, independently
 plausible pause). Today's data has none (see \code{dq_params()}'s docs).
-\item \strong{Forced-largest-gap pass} (2026-09-01, ISSUES.md #14 reopened) —
+\item \strong{Forced-largest-gap pass} (2026-09-01, issue #14 reopened) —
 for any rally STILL over its stroke threshold after pass 1 finds
 nothing, split at the single largest internal gap regardless of
 whether that gap alone clears the absolute threshold. A rally that
