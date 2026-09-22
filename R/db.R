@@ -210,7 +210,7 @@ tennis_weather <- function(con) {
 #'
 #' The SwingVision API's `court.outdoor` field is a single venue-level
 #' profile, not a per-session value, and is wrong for most sessions at a
-#' venue with both indoor and outdoor courts — see `ISSUES.md` #2. Until a
+#' venue with both indoor and outdoor courts — see issue #2. Until a
 #' reliable per-session API field exists, indoor/outdoor is recorded here by
 #' hand (verified per session by inspecting that session's video thumbnail),
 #' as the single source of truth for every consumer (currently
@@ -278,11 +278,11 @@ read_indoor_overrides <- function(path = "data-raw/indoor_overrides.txt") {
 #'
 #' Returns table and column names/types from DuckDB's
 #' `information_schema.columns`, with zero relationship to row count or row
-#' values. Safe to publish alongside a public package template (ISSUES.md
+#' values. Safe to publish alongside a public package template (the issue tracker
 #' #9/#31) even though `con` may point at the real, private `tennis.duckdb`
 #' — the return carries only column definitions, never a data value or a
 #' count of rows. Also the natural building block for a derived-data API
-#' (ISSUES.md #44), since a consumer of that API needs to know the shape of
+#' (issue #44), since a consumer of that API needs to know the shape of
 #' what it can query before querying it.
 #'
 #' @param con A DBI connection from [tennis_db_connect()].

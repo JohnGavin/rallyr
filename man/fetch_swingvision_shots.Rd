@@ -15,7 +15,7 @@ A tibble, one row per shot (see \code{\link[=sv_parse_shots]{sv_parse_shots()}} 
 \description{
 GETs the undocumented \verb{/v1/matches/\{token\}/shots} endpoint -- a separate
 endpoint from \code{\link[=fetch_swingvision]{fetch_swingvision()}} (session-aggregate). Same public
-share-token auth model, confirmed live. See \code{ISSUES.md} #1 and #3 for how
+share-token auth model, confirmed live. See issue #1 and #3 for how
 this was found and what it unblocks (per-shot timestamps + hit_type let a
 session be segmented into its drill parts).
 }

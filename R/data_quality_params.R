@@ -5,16 +5,16 @@
 #' many strokes to plausibly be one continuous point) so they live in one
 #' place instead of scattered across chart-generation code, and so they can
 #' be recalibrated deliberately as more sessions accumulate. See
-#' `ISSUES.md` #5.
+#' issue #5.
 #'
 #' `max_rally_strokes` is a *named list*, not a single number: `mini_tennis`
 #' is a deliberately slow, cooperative warm-up phase where a long
-#' continuous rally is genuinely plausible (see ISSUES.md #3/#4's review of
+#' continuous rally is genuinely plausible (see issue #3/#4's review of
 #' the 14 rallies already found above the *original* default-regime
 #' threshold of 50 strokes — 12 of 14 were `mini_tennis`), so it gets its
 #' own, higher threshold. Every other regime uses `default`.
 #'
-#' **Tightened 2026-09-01 (ISSUES.md #14 and #28 reopened #14 again): 50/60
+#' **Tightened 2026-09-01 (issue #14 and #28 reopened #14 again): 50/60
 #' -> 40/50.** The original 50/60 pair was set from the *first* pass at
 #' `split_flagged_rallies()` (its gap-threshold pass only), which at the
 #' time found no qualifying gap in the data and so never actually resolved
@@ -43,7 +43,7 @@
 #' chart-level *display* filtering (with an explicit on-chart note of how
 #' many rows were excluded and why) may skip a flagged row.
 #'
-#' `max_stroke_gap_sec` (ISSUES.md #14, corrected #42) is the threshold
+#' `max_stroke_gap_sec` (issue #14, corrected #42) is the threshold
 #' [find_rally_splits()] uses to propose a split of an over-long,
 #' `pid`-grouped rally at a pause independently plausible as a real break in
 #' play.
@@ -143,7 +143,7 @@ dq_stroke_gaps <- function(shot_detail) {
 #' 1. **Gap-threshold pass** — [find_rally_splits()] against the
 #'    calibrated `params$max_stroke_gap_sec` (a genuine, independently
 #'    plausible pause). Today's data has none (see `dq_params()`'s docs).
-#' 2. **Forced-largest-gap pass** (2026-09-01, ISSUES.md #14 reopened) —
+#' 2. **Forced-largest-gap pass** (2026-09-01, issue #14 reopened) —
 #'    for any rally STILL over its stroke threshold after pass 1 finds
 #'    nothing, split at the single largest internal gap regardless of
 #'    whether that gap alone clears the absolute threshold. A rally that
@@ -178,7 +178,7 @@ dq_stroke_gaps <- function(shot_detail) {
 #' @export
 #' Split a rally repeatedly until no fragment exceeds the stroke threshold
 #'
-#' ISSUES.md #42. The previous behaviour split an over-long rally **once**,
+#' issue #42. The previous behaviour split an over-long rally **once**,
 #' at its single largest internal gap, which leaves any rally longer than
 #' twice the threshold still over it — a 121-stroke rally became 91 + 30 and
 #' the 91 was reported as "still over threshold" rather than split again.
@@ -279,7 +279,7 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 
 #' The rallies actually usable for plotting — data-quality corrected
 #'
-#' Single source of truth for "which rallies may feed a chart" (ISSUES.md
+#' Single source of truth for "which rallies may feed a chart" (the issue tracker
 #' #28, reopening #14 again): every rally-derived chart in
 #' `scripts/make_artifact_charts.R` reads from this function's output
 #' instead of the raw `rallies` table, so an implausible outlier (too many

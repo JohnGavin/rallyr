@@ -1,6 +1,6 @@
 #' Session-level "effort" index — standardised composite of raw metrics
 #'
-#' ISSUES.md #22: the Summary page showed raw tracked metrics only; there
+#' issue #22: the Summary page showed raw tracked metrics only; there
 #' was no single view answering "did the most recent session stand out —
 #' positively or negatively — from the rest, and on what?" The raw metrics
 #' that plausibly compose physical effort (distance run, stroke volume,

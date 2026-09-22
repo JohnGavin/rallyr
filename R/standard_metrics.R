@@ -1,6 +1,6 @@
 #' Session performance metrics on one comparable scale
 #'
-#' ISSUES.md #32: the tracked session metrics are raw totals in incompatible
+#' issue #32: the tracked session metrics are raw totals in incompatible
 #' units (strokes, miles, mph, minutes), so a longer session scores higher on
 #' most of them for no reason other than being longer. This function fixes the
 #' unit problem in two steps, deliberately kept separate because they answer
@@ -26,7 +26,7 @@
 #' one. `direction` is `1` where higher is better, `-1` where lower is better,
 #' and `NA` for descriptive metrics with no defensible direction — forehand
 #' share is the case in point: an unusually forehand-heavy session is a fact
-#' about the drill (ISSUES.md #3), not an achievement. `NA`-direction metrics
+#' about the drill (issue #3), not an achievement. `NA`-direction metrics
 #' are returned, so they can still be read and plotted, but [session_metric_ranks()]
 #' excludes them from the ranking rather than silently implying they are good.
 #'
@@ -58,7 +58,7 @@ session_standard_metrics <- function(m) {
     list(metric = "shot_share", label = "Share of strokes", unit = "%",
          direction = 1,  value = 100 * m$me_shots / (m$me_shots + m$opp_shots)),
     # No defensible direction: forehand-heavy is a property of the drill
-    # (ISSUES.md #3), not a better or worse session. Reported, never ranked.
+    # (issue #3), not a better or worse session. Reported, never ranked.
     list(metric = "fh_share",   label = "Forehand share",   unit = "%",
          direction = NA_real_, value = 100 * m$fh_shots / wing_shots)
   )
@@ -101,7 +101,7 @@ pct_rank <- function(x) {
 
 #' Rank each session's metrics against each other
 #'
-#' The input for the bump chart (ISSUES.md #32): within each session, the
+#' The input for the bump chart (issue #32): within each session, the
 #' directional metrics from [session_standard_metrics()] are ranked by their
 #' percentile, so rank 1 is the aspect that session was strongest on relative
 #' to the player's own history. Lines joining one metric's rank across

@@ -4,8 +4,8 @@ sv_api_base <- function() "https://api.swing.tennis/v1"
 
 #' Extract a SwingVision share token from a URL or bare token
 #'
-#' @param x A share URL like `https://swing.vision/matches/sw2-a72NHHc` or a
-#'   bare token like `sw2-a72NHHc`.
+#' @param x A share URL like `https://swing.vision/matches/sw2-EXAMPLE01` or a
+#'   bare token like `sw2-EXAMPLE01`.
 #' @return The token string.
 #' @export
 sv_token <- function(x) {
@@ -112,7 +112,7 @@ sv_parse_match <- function(match, stats, me, token = NA_character_) {
 #'
 #' GETs the undocumented `/v1/matches/{token}/shots` endpoint -- a separate
 #' endpoint from [fetch_swingvision()] (session-aggregate). Same public
-#' share-token auth model, confirmed live. See `ISSUES.md` #1 and #3 for how
+#' share-token auth model, confirmed live. See issue #1 and #3 for how
 #' this was found and what it unblocks (per-shot timestamps + hit_type let a
 #' session be segmented into its drill parts).
 #'
@@ -131,18 +131,18 @@ fetch_swingvision_shots <- function(url_or_token) {
 #' Pure function over an already-fetched JSON list (no network) so it is unit
 #' testable against committed fixtures. `spin_type` is categorical (e.g.
 #' `flat`/`topspin`/`slice`) -- there is no numeric spin-rate field in this
-#' endpoint (see `ISSUES.md` #1).
+#' endpoint (see issue #1).
 #'
 #' `shot_in` is derived from `net_type`/`bounce_location_long`/
 #' `bounce_location_lat` (see [sv_shot_in()]) -- the `/shots` payload has no
-#' explicit in/out flag. Validated live against `sw2-a72NHHc`'s known
+#' explicit in/out flag. Validated live against `sw2-EXAMPLE01`'s known
 #' session-level accuracy (`/stats` endpoint: 589/714 = 82.5%): the
 #' bounce/net-derived rate came out 83.6% (597/714) -- close but not exact,
 #' so treat `shot_in` as directionally reliable per-shot signal, not a
 #' bit-exact reproduction of the `/stats` endpoint's own count.
 #'
 #' `rally_id` is the payload's own `pid` field, taken as-is (not derived).
-#' Verified live against `sw2-a72NHHc`: sorted by `started_at`, every `pid`
+#' Verified live against `sw2-EXAMPLE01`: sorted by `started_at`, every `pid`
 #' value forms one contiguous run of shots -- SwingVision already segments
 #' the match into points/rallies itself, so this does not need a time-gap
 #' heuristic. `rally_id` is unique only *within* a `match_id`, not globally

@@ -18,7 +18,7 @@ first, as every session-ordered object in this project is).}
 the composite index).
 }
 \description{
-ISSUES.md #22: the Summary page showed raw tracked metrics only; there
+issue #22: the Summary page showed raw tracked metrics only; there
 was no single view answering "did the most recent session stand out —
 positively or negatively — from the rest, and on what?" The raw metrics
 that plausibly compose physical effort (distance run, stroke volume,

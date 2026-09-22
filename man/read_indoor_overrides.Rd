@@ -19,7 +19,7 @@ A named logical vector, keyed by \code{session_date} formatted
 \description{
 The SwingVision API's \code{court.outdoor} field is a single venue-level
 profile, not a per-session value, and is wrong for most sessions at a
-venue with both indoor and outdoor courts — see \code{ISSUES.md} #2. Until a
+venue with both indoor and outdoor courts — see issue #2. Until a
 reliable per-session API field exists, indoor/outdoor is recorded here by
 hand (verified per session by inspecting that session's video thumbnail),
 as the single source of truth for every consumer (currently
