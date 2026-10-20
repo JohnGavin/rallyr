@@ -38,12 +38,15 @@ test_that("a repeated drill gets an occurrence number", {
   expect_equal(out$regime_occurrence, c(1L, 1L, 2L))
 })
 
-test_that("a pause equal to the threshold splits; one below does not", {
-  s <- mk_session(c(15, 15), 60)          # gap = 60 + 2 within-gap step
-  expect_equal(nrow(segment_session_drills(s, drill_order = c("a", "b"),
+test_that("a pause equal to the threshold splits; one just below does not", {
+  # mk_session() puts the gap exactly between the last stroke of one block and
+  # the first of the next, so the gap here IS min_drill_gap_sec.
+  at <- mk_session(c(15, 15), 60)
+  expect_equal(nrow(segment_session_drills(at, drill_order = c("a", "b"),
                                            min_drill_gap_sec = 60)), 2L)
-  expect_equal(nrow(segment_session_drills(s, drill_order = "a",
-                                           min_drill_gap_sec = 500)), 1L)
+  below <- mk_session(c(15, 15), 59.9)
+  expect_equal(nrow(segment_session_drills(below, drill_order = "a",
+                                           min_drill_gap_sec = 60)), 1L)
 })
 
 test_that("a count mismatch gives NA labels, never forced labels", {
