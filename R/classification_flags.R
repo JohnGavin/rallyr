@@ -64,3 +64,45 @@ flag_net_call_contradicted <- function(shots, max_gap_sec = Inf) {
   shots$net_call_contradicted <- out
   shots
 }
+
+#' Flag stroke-type labels that are probably wrong at the net
+#'
+#' In a drill where one player volleys at the net and the other plays from
+#' the baseline, true volleys by the baseline player are rare (at most one or
+#' two per drill in the observed play), so most `hit_type == "volley"` labels
+#' on that side are the vendor classifier's mistakes. This function adds a
+#' logical flag, `hit_type_suspect`, for exactly those strokes: the
+#' baseline player's (`me_side`) volleys inside a net-volley drill. It does
+#' NOT relabel anything: `hit_type` is left as parsed, because there is no
+#' independent ground truth here to re-derive a corrected label from.
+#'
+#' @section Role purity is an undercount:
+#' Any per-role composition metric (for example "share of the net player's
+#' strokes that are volleys") should be read as a plausible LOWER bound, not
+#' a precise measurement. The vendor classifier confuses adjacent stroke
+#' types in both directions: a real share of the net player's volleys are
+#' labelled as a stroke type used to open a rally, and a real share of the
+#' baseline player's strokes are labelled as volleys. Both confusions push the
+#' measured purity of each role below what direct observation suggests. Report
+#' such a metric together with this caveat, and with the count of
+#' `hit_type_suspect` strokes where it is shown.
+#'
+#' @param shots A tibble with `player`, `hit_type` and `regime` (a drill
+#'   label per stroke, e.g. joined from [segment_session_drills()]).
+#' @param me_side Which `player` value is the baseline player (`"guest"`).
+#' @param net_regimes Character vector of regime values that are net-volley
+#'   drills (`"net_volley"`).
+#' @return `shots` with a logical column `hit_type_suspect` (never `NA`).
+#' @export
+flag_hit_type_suspect <- function(shots, me_side = "guest", net_regimes = "net_volley") {
+  need <- c("player", "hit_type", "regime")
+  if (!all(need %in% names(shots))) {
+    cli::cli_abort(c(
+      "x" = "{.arg shots} needs {.val {need}}.",
+      "i" = "Missing: {.val {setdiff(need, names(shots))}}."
+    ))
+  }
+  shots$hit_type_suspect <-
+    (shots$player %in% me_side) & (shots$hit_type %in% "volley") & (shots$regime %in% net_regimes)
+  shots
+}
