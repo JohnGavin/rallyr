@@ -3043,7 +3043,7 @@
       as.data.frame(segs)
     Output
         segment_index               regime          start_time            end_time
-      1             1          mini_tennis 2030-01-05 16:00:00 2030-01-05 16:02:52
+      1             1                  gap 2030-01-05 16:00:00 2030-01-05 16:02:52
       2             2           net_volley 2030-01-05 16:03:40 2030-01-05 16:07:51
       3             3 forehand_cross_court 2030-01-05 16:09:11 2030-01-05 16:13:23
       4             4 backhand_cross_court 2030-01-05 16:14:32 2030-01-05 16:18:29

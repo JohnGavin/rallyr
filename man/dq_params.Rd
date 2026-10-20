@@ -9,6 +9,7 @@ dq_params()
 \value{
 A named list: \code{max_mean_stroke_speed_kmh} (numeric),
 \code{max_individual_stroke_speed_kmh} (numeric),
+\code{min_segment_duration_min} (numeric),
 \code{max_rally_strokes} (a named list with \code{default}, \code{mini_tennis},
 \code{forehand_cross_court} and \code{backhand_cross_court}; the "me" side's
 strokes), \code{max_stroke_gap_sec} (a named list with \code{forehand_cross_court},
@@ -75,4 +76,10 @@ four 50 km/h strokes averages 78 km/h and passes the mean check. It sits
 above any plausible recreational stroke and well below tracking
 artefacts; recalibrate it from the per-rally maximum speed distribution
 as sessions accumulate.
+
+\code{min_segment_duration_min} (3) is the shortest same-regime run of bins
+\code{\link[=segment_session_shots]{segment_session_shots()}} accepts as a real drill instance; a shorter run
+is a mis-segmentation artefact and is relabelled \code{"gap"}. It is distinct
+from the per-bin \code{min_shots_per_bin}, which filters single one-minute bins
+before they are merged.
 }

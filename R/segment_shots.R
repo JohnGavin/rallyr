@@ -30,14 +30,22 @@
 #' @param wing_dominance_threshold Guest ground-stroke right-wing share
 #'   at/above (or at/below `1 - threshold`) which a bin is a cross-court
 #'   phase. Default `0.7`.
+#' @param min_segment_duration_min Minimum duration, in minutes, for a
+#'   contiguous same-regime SEGMENT (after bins are merged) to keep its
+#'   detected regime; a shorter segment (not already `"gap"`) is relabelled
+#'   `"gap"`. Distinct from `min_shots_per_bin`, which filters individual
+#'   bins before merging: this catches a short run of bins that each passed
+#'   the bin-level filter but together are too brief to be a real drill
+#'   instance. Default from [dq_params()]'s `min_segment_duration_min` (`3`);
+#'   pass `0` to disable.
 #' @return A tibble, one row per detected segment (contiguous bins sharing a
 #'   regime), ordered by `start_time`: `segment_index`, `regime`
 #'   (`"mini_tennis"`/`"net_volley"`/`"forehand_cross_court"`/
 #'   `"backhand_cross_court"`/`"mixed"`/`"gap"`), `start_time`, `end_time`,
 #'   `duration_min`, `n_shots`, `n_host_shots`, `n_guest_shots`. `"gap"` rows
 #'   are real breaks in play (a real segment boundary can fragment into
-#'   segment/gap/segment) -- callers should treat `"gap"` as filler, not a
-#'   drill phase.
+#'   segment/gap/segment) or an implausibly short same-regime segment --
+#'   callers should treat `"gap"` as filler, not a drill phase.
 #' @export
 segment_session_shots <- function(shots,
                                    guest_right_handed = TRUE,
@@ -45,7 +53,8 @@ segment_session_shots <- function(shots,
                                    min_shots_per_bin = 4,
                                    volley_share_threshold = 0.4,
                                    mini_tennis_speed_mph = 35,
-                                   wing_dominance_threshold = 0.7) {
+                                   wing_dominance_threshold = 0.7,
+                                   min_segment_duration_min = dq_params()$min_segment_duration_min) {
   bins <- shots |>
     dplyr::mutate(
       bin = floor(as.numeric(difftime(started_at, min(started_at), units = "mins")) / bin_minutes)
@@ -83,7 +92,7 @@ segment_session_shots <- function(shots,
   run <- rle(bins$regime)
   bins$segment_index <- rep(seq_along(run$lengths), run$lengths)
 
-  bins |>
+  segs <- bins |>
     dplyr::group_by(segment_index, regime) |>
     dplyr::summarise(
       start_time    = min(start_time),
@@ -93,7 +102,21 @@ segment_session_shots <- function(shots,
       n_guest_shots = sum(n_guest),
       .groups = "drop"
     ) |>
-    dplyr::mutate(duration_min = round(as.numeric(difftime(end_time, start_time, units = "mins")), 1)) |>
+    dplyr::mutate(duration_min = round(as.numeric(difftime(end_time, start_time, units = "mins")), 1))
+
+  # A segment that is implausibly short is a mis-segmentation artefact, not a
+  # real drill instance: relabel it "gap" so it no longer claims its own
+  # drill slot downstream. Segments already "gap" are left alone.
+  segs <- segs |>
+    dplyr::mutate(
+      regime = dplyr::if_else(
+        regime != "gap" & duration_min < min_segment_duration_min,
+        "gap",
+        regime
+      )
+    )
+
+  segs |>
     dplyr::relocate(segment_index, regime, start_time, end_time, duration_min,
                      n_shots, n_host_shots, n_guest_shots) |>
     dplyr::arrange(segment_index)

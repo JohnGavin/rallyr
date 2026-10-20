@@ -56,8 +56,15 @@
 #' artefacts; recalibrate it from the per-rally maximum speed distribution
 #' as sessions accumulate.
 #'
+#' `min_segment_duration_min` (3) is the shortest same-regime run of bins
+#' [segment_session_shots()] accepts as a real drill instance; a shorter run
+#' is a mis-segmentation artefact and is relabelled `"gap"`. It is distinct
+#' from the per-bin `min_shots_per_bin`, which filters single one-minute bins
+#' before they are merged.
+#'
 #' @return A named list: `max_mean_stroke_speed_kmh` (numeric),
 #'   `max_individual_stroke_speed_kmh` (numeric),
+#'   `min_segment_duration_min` (numeric),
 #'   `max_rally_strokes` (a named list with `default`, `mini_tennis`,
 #'   `forehand_cross_court` and `backhand_cross_court`; the "me" side's
 #'   strokes), `max_stroke_gap_sec` (a named list with `forehand_cross_court`,
@@ -71,6 +78,7 @@ dq_params <- function() {
   list(
     max_mean_stroke_speed_kmh = 100,
     max_individual_stroke_speed_kmh = 160,
+    min_segment_duration_min = 3,
     max_rally_strokes = list(
       default = 25, mini_tennis = 50,
       forehand_cross_court = 20, backhand_cross_court = 20
