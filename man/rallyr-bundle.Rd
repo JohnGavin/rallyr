@@ -17,7 +17,7 @@ bundle_new()
 
 bundle_payload_kind(x, strict = TRUE)
 
-bundle_read(path)
+bundle_read(path, max_bytes = bundle_max_bytes())
 
 bundle_write(bundle, path)
 
@@ -41,6 +41,11 @@ bundle_derived(tables, params = dq_params())
 \code{bundle_write()}, the file to write (always gzip-compressed; a name ending
 \code{.json.gz} is conventional).}
 
+\item{max_bytes}{The largest file, and the largest text once uncompressed,
+that \code{bundle_read()} accepts, in bytes. Defaults to
+\code{getOption("rallyr.bundle_max_bytes", 50 * 1024^2)} (50 MB, far above a
+real bundle). A larger file is an error, not a partial read.}
+
 \item{bundle}{A bundle (\code{\link[=bundle_new]{bundle_new()}}, \code{\link[=bundle_read]{bundle_read()}}).}
 
 \item{...}{For \code{bundle_add_raw()}, the three payloads of ONE session, each a
@@ -50,9 +55,11 @@ each kind is required, and the shots must belong to the match.}
 
 \item{token}{Optional share token to record with the session.}
 
-\item{fetched_at}{When the payloads were fetched (an ISO-8601 string);
-defaults to now. \code{\link[=bundle_merge]{bundle_merge()}} uses it to decide which copy of a
-session is newer.}
+\item{fetched_at}{When the payloads were fetched (an ISO-8601 date-time, such
+as \code{"2031-01-01T09:00:00Z"}; a numeric offset and fractional seconds are
+accepted, and a time with no offset is read as UTC); defaults to now.
+\code{\link[=bundle_merge]{bundle_merge()}} compares these as instants to decide which copy of a
+session is newer. A value that is not a date-time is an error.}
 
 \item{y}{A bundle to merge into \code{bundle}.}
 
@@ -65,7 +72,7 @@ metrics assume.}
 be parsed; \code{"skip"} leaves it out and lists it in \verb{$skipped}.}
 
 \item{cache}{\code{NULL}, or an environment used to remember each session's
-tables (keyed by match, fetch time and \code{me}), so that adding one session
+tables (keyed by match, fetch time, a hash of the three payloads and \code{me}), so that adding one session
 does not recompute the others.}
 
 \item{tables}{The list returned by \code{bundle_to_tables()}.}
@@ -80,7 +87,7 @@ does not recompute the others.}
 shot list is read as \code{"shots"}.
 
 \code{bundle_read()} returns a bundle. It stops with an error, naming the
-problem, for a file that is empty, is not JSON, has no or a too-new
+problem, for a file that is too large, empty, not JSON, has no or a too-new
 \code{schema_version}, or holds a session whose payloads are missing, are of the
 wrong kind or share a \code{match_id}.
 
@@ -92,8 +99,12 @@ replacing the same \code{match_id}), with the merge report in
 
 \code{bundle_merge()} returns a bundle. A session of \code{y} whose \code{match_id}
 is new is \strong{added}; one already present \strong{replaces} the existing copy
-when its \code{fetched_at} is the same or newer, and is otherwise \strong{kept} out
-(the existing copy is newer); an identical payload is \strong{unchanged}. The
+when its \code{fetched_at} is the same instant or newer (a tie goes to the
+incoming copy), and is otherwise \strong{kept} out (the existing copy is
+newer); an identical payload is \strong{unchanged} (the existing copy and its
+\code{fetched_at} stay). A copy with no \code{fetched_at} counts as the oldest. On
+\strong{replaced} and \strong{unchanged}, the session keeps the incoming \code{token} if
+it has one, otherwise the existing one. The
 report, one row per session of \code{y}, is in \code{attr(., "merge_report")} with
 columns \code{match_id}, \code{action} (\code{"added"}, \code{"replaced"}, \code{"kept"} or
 \code{"unchanged"}), \code{existing_fetched_at} and \code{incoming_fetched_at}.

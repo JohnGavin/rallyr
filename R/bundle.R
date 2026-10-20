@@ -67,25 +67,65 @@ print.rallyr_bundle <- function(x, ...) {
 
 # ---- reading JSON ----------------------------------------------------------
 
-# Text of a file that is either gzip-compressed or plain JSON.
-bundle_read_text <- function(path) {
+# The largest file, and the largest decompressed text, that is read (bytes).
+# One home for the number: `options(rallyr.bundle_max_bytes = <bytes>)` changes
+# it. 50 MB is far above a real bundle (a few MB) and keeps a browser tab alive.
+bundle_max_bytes <- function() {
+  v <- getOption("rallyr.bundle_max_bytes", 50 * 1024^2)
+  if (!is.numeric(v) || length(v) != 1L || is.na(v) || v <= 0) {
+    cli::cli_abort("{.code options(rallyr.bundle_max_bytes)} must be a single positive number of bytes.")
+  }
+  v
+}
+
+bundle_mb <- function(bytes) format(round(bytes / 1024^2, 1), nsmall = 1, trim = TRUE)
+
+# Text of a file that is either gzip-compressed or plain JSON, refusing a file
+# over `max_bytes` and a gzip file that expands past `max_bytes`.
+bundle_read_text <- function(path, max_bytes = bundle_max_bytes()) {
+  if (!is.numeric(max_bytes) || length(max_bytes) != 1L || is.na(max_bytes) || max_bytes <= 0) {
+    cli::cli_abort("{.arg max_bytes} must be a single positive number of bytes.")
+  }
   if (!is.character(path) || length(path) != 1L || is.na(path) || !file.exists(path)) {
     cli::cli_abort(c(
       "x" = "{.arg path} must be the path of an existing file.",
       "i" = "Got {.val {if (is.character(path) && length(path) == 1L) path else class(path)}}."
     ))
   }
-  bytes <- readBin(path, "raw", n = file.size(path))
+  size <- file.size(path)
+  if (size > max_bytes) {
+    cli::cli_abort(c(
+      "x" = "The file {.file {path}} is too large ({bundle_mb(size)} MB; the limit is {bundle_mb(max_bytes)} MB).",
+      "i" = "A bundle of sessions is a few MB. Check that this is the right file."
+    ))
+  }
+  bytes <- readBin(path, "raw", n = size)
   if (length(bytes) == 0L) {
     cli::cli_abort("The file {.file {path}} is empty.")
   }
   if (length(bytes) >= 2L && bytes[1] == as.raw(0x1f) && bytes[2] == as.raw(0x8b)) {
     con <- gzcon(rawConnection(bytes))
     on.exit(close(con), add = TRUE)
-    lines <- readLines(con, warn = FALSE, encoding = "UTF-8")
-    return(paste(lines, collapse = "\n"))
+    chunks <- list()
+    total <- 0
+    repeat {
+      chunk <- readBin(con, "raw", n = 1024^2)
+      if (length(chunk) == 0L) break
+      total <- total + length(chunk)
+      if (total > max_bytes) {
+        cli::cli_abort(c(
+          "x" = "The file {.file {path}} is too large once uncompressed (more than {bundle_mb(max_bytes)} MB).",
+          "i" = "A bundle of sessions is a few MB. Check that this is the right file."
+        ))
+      }
+      chunks[[length(chunks) + 1L]] <- chunk
+    }
+    bytes <- unlist(chunks, use.names = FALSE)
+    if (is.null(bytes)) cli::cli_abort("The file {.file {path}} is empty.")
   }
-  rawToChar(bytes)
+  txt <- rawToChar(bytes)
+  Encoding(txt) <- "UTF-8"
+  txt
 }
 
 # `jsonlite::fromJSON()` treats a string that is a URL or an existing file path
@@ -110,9 +150,9 @@ bundle_unwrap <- function(obj) {
 }
 
 # A payload given as a path to a JSON file, or as an already-parsed list.
-bundle_as_payload <- function(x, what = "payload") {
+bundle_as_payload <- function(x, what = "payload", max_bytes = bundle_max_bytes()) {
   if (is.character(x) && length(x) == 1L && !is.na(x)) {
-    return(bundle_parse_json(bundle_read_text(x), sprintf("The file %s", x)))
+    return(bundle_parse_json(bundle_read_text(x, max_bytes), sprintf("The file %s", x)))
   }
   if (is.list(x)) return(x)
   cli::cli_abort(c(
@@ -167,6 +207,40 @@ bundle_kind_parsed <- function(obj) {
 
 # ---- validation ------------------------------------------------------------
 
+# A fetch time as a UTC instant (seconds since 1970, fractions kept); NA when
+# the text is not an ISO-8601 date-time. Accepts a trailing `Z`, a numeric
+# offset (`+02:00`, `-0200`, `+02`), fractional seconds, and a bare date
+# (read as midnight UTC). A time with no offset is read as UTC.
+bundle_stamp_seconds <- function(x) {
+  if (!is.character(x) || length(x) != 1L || is.na(x)) return(NA_real_)
+  x <- trimws(x)
+  m <- regmatches(x, regexec(
+    paste0("^(\\d{4}-\\d{2}-\\d{2})(?:[T ](\\d{2}:\\d{2}:\\d{2})(\\.\\d+)?",
+           "(Z|[+-]\\d{2}(?::?\\d{2})?)?)?$"),
+    x, perl = TRUE
+  ))[[1]]
+  if (length(m) == 0L) return(NA_real_)
+  clock <- if (nzchar(m[3])) m[3] else "00:00:00"
+  base <- as.POSIXct(paste(m[2], clock), tz = "UTC", format = "%Y-%m-%d %H:%M:%S")
+  if (is.na(base)) return(NA_real_)
+  frac <- if (nzchar(m[4])) as.numeric(paste0("0", m[4])) else 0
+  off <- m[5]
+  shift <- 0
+  if (nzchar(off) && off != "Z") {
+    digits <- gsub("[^0-9]", "", substring(off, 2L))
+    hh <- as.numeric(substr(digits, 1L, 2L))
+    mm <- if (nchar(digits) > 2L) as.numeric(substr(digits, 3L, 4L)) else 0
+    if (hh > 23 || mm > 59) return(NA_real_)
+    shift <- (hh * 3600 + mm * 60) * if (substr(off, 1L, 1L) == "-") -1 else 1
+  }
+  as.numeric(base) + frac - shift
+}
+
+# Seconds of a session's `fetched_at`; -Inf when it has none (the oldest).
+bundle_session_stamp <- function(s) {
+  if (is.null(s$fetched_at)) -Inf else bundle_stamp_seconds(s$fetched_at)
+}
+
 bundle_id_key <- function(id) format(as.numeric(id), scientific = FALSE, trim = TRUE)
 
 bundle_validate <- function(x) {
@@ -201,6 +275,19 @@ bundle_validate <- function(x) {
         bad("In session {i}, the {.field {slot}} payload does not look like a {slot} payload.")
       }
     }
+    if (is.na(bundle_session_stamp(s))) {
+      bad("Session {i} has a {.field fetched_at} that is not an ISO-8601 date-time (such as 2031-01-01T09:00:00Z).")
+    }
+    payload_id <- bundle_unwrap(s$match)$id
+    if (is.null(payload_id) || !is.numeric(payload_id) || length(payload_id) != 1L ||
+          is.na(payload_id) || bundle_id_key(payload_id) != bundle_id_key(id)) {
+      bad("In session {i}, {.field match_id} does not match the id inside the match payload.")
+    }
+    shot_ids <- unlist(lapply(bundle_unwrap(s$shots), function(z) z$match_id))
+    if (length(shot_ids) > 0L && (!is.numeric(shot_ids) || any(is.na(shot_ids)) ||
+          any(shot_ids != id))) {
+      bad("In session {i}, the shots do not belong to the match (their {.field match_id} differs).")
+    }
   }
   keys <- vapply(x$sessions, function(s) bundle_id_key(s$match_id), character(1))
   if (anyDuplicated(keys) > 0L) {
@@ -227,13 +314,17 @@ unclass_bundle <- function(x) {
 #' @param path For `bundle_read()`, the file to read (gzip or plain JSON); for
 #'   `bundle_write()`, the file to write (always gzip-compressed; a name ending
 #'   `.json.gz` is conventional).
+#' @param max_bytes The largest file, and the largest text once uncompressed,
+#'   that `bundle_read()` accepts, in bytes. Defaults to
+#'   `getOption("rallyr.bundle_max_bytes", 50 * 1024^2)` (50 MB, far above a
+#'   real bundle). A larger file is an error, not a partial read.
 #' @return `bundle_read()` returns a bundle. It stops with an error, naming the
-#'   problem, for a file that is empty, is not JSON, has no or a too-new
+#'   problem, for a file that is too large, empty, not JSON, has no or a too-new
 #'   `schema_version`, or holds a session whose payloads are missing, are of the
 #'   wrong kind or share a `match_id`.
 #' @export
-bundle_read <- function(path) {
-  txt <- bundle_read_text(path)
+bundle_read <- function(path, max_bytes = bundle_max_bytes()) {
+  txt <- bundle_read_text(path, max_bytes)
   bundle_validate(bundle_parse_json(txt, sprintf("The file %s", path)))
 }
 
@@ -266,9 +357,11 @@ fetched_now <- function() format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 #'   is detected from its content ([bundle_payload_kind()]). Exactly one of
 #'   each kind is required, and the shots must belong to the match.
 #' @param token Optional share token to record with the session.
-#' @param fetched_at When the payloads were fetched (an ISO-8601 string);
-#'   defaults to now. [bundle_merge()] uses it to decide which copy of a
-#'   session is newer.
+#' @param fetched_at When the payloads were fetched (an ISO-8601 date-time, such
+#'   as `"2031-01-01T09:00:00Z"`; a numeric offset and fractional seconds are
+#'   accepted, and a time with no offset is read as UTC); defaults to now.
+#'   [bundle_merge()] compares these as instants to decide which copy of a
+#'   session is newer. A value that is not a date-time is an error.
 #' @return `bundle_add_raw()` returns the bundle with the session added (or
 #'   replacing the same `match_id`), with the merge report in
 #'   `attr(., "merge_report")` (see [bundle_merge()]).
@@ -317,8 +410,12 @@ bundle_add_raw <- function(bundle, ..., token = NA_character_, fetched_at = fetc
 #' @param y A bundle to merge into `bundle`.
 #' @return `bundle_merge()` returns a bundle. A session of `y` whose `match_id`
 #'   is new is **added**; one already present **replaces** the existing copy
-#'   when its `fetched_at` is the same or newer, and is otherwise **kept** out
-#'   (the existing copy is newer); an identical payload is **unchanged**. The
+#'   when its `fetched_at` is the same instant or newer (a tie goes to the
+#'   incoming copy), and is otherwise **kept** out (the existing copy is
+#'   newer); an identical payload is **unchanged** (the existing copy and its
+#'   `fetched_at` stay). A copy with no `fetched_at` counts as the oldest. On
+#'   **replaced** and **unchanged**, the session keeps the incoming `token` if
+#'   it has one, otherwise the existing one. The
 #'   report, one row per session of `y`, is in `attr(., "merge_report")` with
 #'   columns `match_id`, `action` (`"added"`, `"replaced"`, `"kept"` or
 #'   `"unchanged"`), `existing_fetched_at` and `incoming_fetched_at`.
@@ -328,6 +425,10 @@ bundle_merge <- function(bundle, y) {
   y <- bundle_validate(unclass_bundle(y))
   keys <- vapply(x$sessions, function(s) bundle_id_key(s$match_id), character(1))
   fetched <- function(s) if (is.null(s$fetched_at)) "" else as.character(s$fetched_at)
+  # The incoming token wins when it has one; otherwise the existing one stays.
+  token_of <- function(incoming, existing) {
+    if (!is.null(incoming$token)) incoming$token else existing$token
+  }
   rows <- vector("list", length(y$sessions))
   for (i in seq_along(y$sessions)) {
     s <- y$sessions[[i]]
@@ -343,8 +444,10 @@ bundle_merge <- function(bundle, y) {
       old <- fetched(old_s)
       if (identical(old_s$match, s$match) && identical(old_s$stats, s$stats) &&
             identical(old_s$shots, s$shots)) {
+        x$sessions[[pos]]$token <- token_of(s, old_s)
         action <- "unchanged"
-      } else if (fetched(s) >= old) {
+      } else if (bundle_session_stamp(s) >= bundle_session_stamp(old_s)) {
+        s$token <- token_of(s, old_s)
         x$sessions[[pos]] <- s
         action <- "replaced"
       } else {
@@ -532,7 +635,7 @@ bundle_session_tables <- function(s, me) {
 #' @param on_error `"abort"` (default) stops at the first session that cannot
 #'   be parsed; `"skip"` leaves it out and lists it in `$skipped`.
 #' @param cache `NULL`, or an environment used to remember each session's
-#'   tables (keyed by match, fetch time and `me`), so that adding one session
+#'   tables (keyed by match, fetch time, a hash of the three payloads and `me`), so that adding one session
 #'   does not recompute the others.
 #' @return `bundle_to_tables()` returns a list: `matches`, `shot_segments`,
 #'   `shot_detail` and `rallies` (tibbles shaped like the stored tables read by
@@ -558,7 +661,7 @@ bundle_to_tables <- function(bundle, me, on_error = c("abort", "skip"), cache = 
   for (s in bundle$sessions) {
     key <- paste(
       bundle_id_key(s$match_id), if (is.null(s$fetched_at)) "" else s$fetched_at,
-      tolower(trimws(me)), sep = "|"
+      rlang::hash(list(s$match, s$stats, s$shots)), tolower(trimws(me)), sep = "|"
     )
     if (!is.null(cache) && exists(key, envir = cache, inherits = FALSE)) {
       res <- get(key, envir = cache, inherits = FALSE)

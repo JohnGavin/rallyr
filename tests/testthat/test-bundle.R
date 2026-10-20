@@ -425,3 +425,138 @@ test_that("the sample bundle holds only synthetic content", {
     as.Date(substr(s$match$data$started_at, 1, 10)) >= as.Date("2029-01-01")
   }, logical(1))))
 })
+
+# ---- fetch times are compared as times ---------------------------------------
+
+test_that("fetch times are compared as instants: offsets, fractions and Z", {
+  base <- sample_session(1L)
+  differ <- function(s) { s$match$data$recording_duration <- 4321; s }
+  stamp <- function(s, at) { s$fetched_at <- at; s }
+  action <- function(old, new) {
+    attr(bundle_merge(bundle_of(stamp(base, old)), bundle_of(stamp(differ(base), new))), "merge_report")$action
+  }
+  # 10:00 at +02:00 is 08:00Z, EARLIER than 09:00Z (string order says later)
+  expect_identical(action("2031-01-01T09:00:00Z", "2031-01-01T10:00:00+02:00"), "kept")
+  # 10:00 at -02:00 is 12:00Z, later than 09:00Z
+  expect_identical(action("2031-01-01T09:00:00Z", "2031-01-01T10:00:00-02:00"), "replaced")
+  expect_identical(action("2031-01-01T09:00:00Z", "2031-01-01T10:00:00-0200"), "replaced")
+  # fractional seconds
+  expect_identical(action("2031-01-01T09:00:00.500Z", "2031-01-01T09:00:00.250Z"), "kept")
+  expect_identical(action("2031-01-01T09:00:00.250Z", "2031-01-01T09:00:00.500Z"), "replaced")
+  # the same instant written two ways ties, and a tie replaces
+  expect_identical(action("2031-01-01T09:00:00Z", "2031-01-01T11:00:00+02:00"), "replaced")
+})
+
+test_that("an unreadable fetch time is refused with a clear message", {
+  s <- sample_session(1L)
+  for (bad in c("yesterday", "2031-13-45T00:00:00Z", "", "2031-01-01T25:00:00Z")) {
+    s$fetched_at <- bad
+    expect_error(bundle_merge(bundle_new(), bundle_of(s)), "fetched_at", info = bad)
+  }
+  s$fetched_at <- 12345
+  expect_error(bundle_validate(bundle_of(s)), "fetched_at")
+  expect_error(
+    bundle_add_raw(bundle_new(), sample_session(1L)$match, sample_session(1L)$stats,
+                   sample_session(1L)$shots, fetched_at = "garbage"),
+    "fetched_at"
+  )
+})
+
+# ---- the per-session cache sees the content ----------------------------------
+
+test_that("a same-stamp replacement does not read a stale cache entry", {
+  a <- sample_session(1L); a$fetched_at <- "2031-01-01T00:00:00Z"
+  b <- a
+  b$shots$data <- b$shots$data[-1]            # one shot fewer, same match, same stamp
+  cache <- new.env()
+  first <- bundle_to_tables(bundle_of(a), "Sample Player", cache = cache)
+  second <- bundle_to_tables(bundle_of(b), "Sample Player", cache = cache)
+  expect_equal(nrow(second$shot_detail), nrow(first$shot_detail) - 1L)
+  expect_length(ls(cache), 2L)
+})
+
+# ---- a session's ids agree ---------------------------------------------------
+
+test_that("a session's match_id must equal its match payload id and its shots' ids", {
+  s <- sample_session(1L)
+  wrong_id <- s; wrong_id$match_id <- s$match_id + 1
+  expect_error(bundle_validate(bundle_of(wrong_id)), "does not match")
+  no_payload_id <- s; no_payload_id$match$data$id <- NULL
+  expect_error(bundle_validate(bundle_of(no_payload_id)), "Cannot|no .*id|does not look like")
+  foreign <- s; foreign$shots$data[[2]]$match_id <- s$match_id + 7
+  expect_error(bundle_validate(bundle_of(foreign)), "shots .*do not belong|belong")
+  # a read bundle is checked too
+  path <- withr::local_tempfile(fileext = ".json.gz")
+  con <- gzfile(path, "wb")
+  writeLines(as.character(jsonlite::toJSON(
+    list(schema_version = 1L, sessions = list(wrong_id)), auto_unbox = TRUE, null = "null", digits = NA
+  )), con)
+  close(con)
+  expect_error(bundle_read(path), "does not match")
+  # two sessions for one match are still refused
+  expect_error(bundle_validate(bundle_of(s, s)), "share a")
+})
+
+# ---- the tie rule and tokens on replace --------------------------------------
+
+test_that("a replaced or unchanged session keeps the incoming token, else the existing one", {
+  old <- sample_session(1L); old$fetched_at <- "2031-01-01T00:00:00Z"; old$token <- "sw2-OLD00001"
+  new_token <- old; new_token$token <- "sw2-NEW00001"
+  no_token <- old; no_token$token <- NULL
+
+  # unchanged payload, incoming token wins; the existing fetch time stays
+  m <- bundle_merge(bundle_of(old), bundle_of(new_token))
+  expect_identical(attr(m, "merge_report")$action, "unchanged")
+  expect_identical(m$sessions[[1]]$token, "sw2-NEW00001")
+  expect_identical(m$sessions[[1]]$fetched_at, "2031-01-01T00:00:00Z")
+  # unchanged payload, no incoming token: the existing one stays
+  m <- bundle_merge(bundle_of(old), bundle_of(no_token))
+  expect_identical(m$sessions[[1]]$token, "sw2-OLD00001")
+
+  changed <- no_token; changed$match$data$recording_duration <- 99   # same stamp: a tie
+  m <- bundle_merge(bundle_of(old), bundle_of(changed))
+  expect_identical(attr(m, "merge_report")$action, "replaced")
+  expect_identical(m$sessions[[1]]$token, "sw2-OLD00001")
+  expect_identical(m$sessions[[1]]$match$data$recording_duration, 99)
+  changed$token <- "sw2-NEW00002"
+  m <- bundle_merge(bundle_of(old), bundle_of(changed))
+  expect_identical(m$sessions[[1]]$token, "sw2-NEW00002")
+})
+
+# ---- size limits ---------------------------------------------------------------
+
+test_that("the default size cap is one documented, overridable number", {
+  expect_identical(bundle_max_bytes(), 50 * 1024^2)
+  withr::local_options(rallyr.bundle_max_bytes = 1234)
+  expect_identical(bundle_max_bytes(), 1234)
+  withr::local_options(rallyr.bundle_max_bytes = "lots")
+  expect_error(bundle_max_bytes(), "rallyr.bundle_max_bytes")
+})
+
+test_that("a file over the cap is refused with a friendly message", {
+  path <- withr::local_tempfile(fileext = ".json.gz")
+  bundle_write(sample_bundle(), path)
+  expect_error(bundle_read(path, max_bytes = 100), "too large")
+  expect_s3_class(bundle_read(path, max_bytes = 10 * 1024^2), "rallyr_bundle")
+  withr::local_options(rallyr.bundle_max_bytes = 100)
+  expect_error(bundle_read(path), "too large")
+  expect_error(bundle_payload_kind(path), "too large")
+})
+
+test_that("a small file that expands past the cap is refused while reading it", {
+  bomb <- withr::local_tempfile(fileext = ".json.gz")
+  con <- gzfile(bomb, "wb")
+  writeLines(strrep("a", 200000L), con)
+  close(con)
+  expect_lt(file.size(bomb), 1000)
+  expect_error(bundle_read(bomb, max_bytes = 5000), "uncompressed|decompress|expands")
+  # under the cap the same file is read, and then rejected for being no bundle
+  expect_error(bundle_read(bomb, max_bytes = 10 * 1024^2), "not valid JSON")
+})
+
+test_that("a cap that is not a positive number is an error", {
+  path <- withr::local_tempfile(fileext = ".json.gz")
+  bundle_write(bundle_new(), path)
+  expect_error(bundle_read(path, max_bytes = -1), "max_bytes")
+  expect_error(bundle_read(path, max_bytes = NA_real_), "max_bytes")
+})
