@@ -15,13 +15,18 @@
 #    a table or file straight from a URL;
 #  * `unlisted-origin`: code or data names an origin that is not on the
 #    navigation allow-list (a link a person may click, never a request);
-#  * `csp-missing` / `csp-connect-src`: a page under --csp-dir has no policy, or
-#    its connect-src allows more than 'self', blob: and data:.
+#  * `csp-missing` / `csp-connect-src` / `csp-fetch-src`: a page under --csp-dir
+#    has no policy, or its connect-src or default-src allows more than 'self',
+#    blob: and data:, or any other fetch directive (script-src, worker-src,
+#    style-src, img-src, font-src, frame-src, child-src, media-src, object-src,
+#    manifest-src) names a host, a scheme such as https:, or `*`.
 #
 # What this does NOT show: that the vendored runtime (Shinylive, WebAssembly R,
 # pkgdown's own assets: the folders in `skip_dirs` and the files in
-# `skip_files`; pkgdown.js, for one, fetches the site's own search index, and
-# Shinylive's service worker names its default package repositories)
+# `skip_files`, which are matched by their path from the site root, so a file
+# of the same name elsewhere is still scanned; pkgdown.js, for one, fetches the
+# site's own search index, and Shinylive's service worker names its default
+# package repositories)
 # makes no request to another origin, and a
 # <meta> policy does not bind workers. That is what the browser check
 # (tools/check_app_requests.mjs) observes. This script covers the code we write.
@@ -45,6 +50,19 @@ r_patterns <- c(
   httr = "\\bhttr2?::",
   webr_net = "webr::(install|mount)",
   read_from_url = "(readLines|read\\.csv|read_csv|fromJSON|readRDS|scan)\\s*\\(\\s*[\"']https?://"
+)
+# Only in R files (`url(` is ordinary CSS): any use of the HTTP package or of a
+# connection or request, whatever the address.
+r_code_patterns <- c(
+  httr2_any = "\\bhttr2\\b",
+  request_call = "\\brequest\\s*\\(",
+  req_perform = "\\breq_perform\\s*\\(",
+  url_any = "\\burl\\s*\\("
+)
+csp_fetch_directives <- c(
+  "script-src", "script-src-elem", "script-src-attr", "style-src", "style-src-elem",
+  "img-src", "font-src", "frame-src", "child-src", "worker-src", "media-src",
+  "object-src", "manifest-src", "prefetch-src"
 )
 fetching_rel <- "stylesheet|preload|prefetch|preconnect|dns-prefetch|icon|modulepreload|manifest"
 
@@ -153,6 +171,20 @@ scan_html <- function(html, allowed_resources, file, require_csp) {
       if (is.null(default) || !identical(default, "'self'")) {
         add(violation(file, 1L, "csp-connect-src", paste("default-src:", paste(default, collapse = " "))))
       }
+      # Every other fetch directive: only keywords, hashes, blob: and data:
+      # (no host, no scheme such as https:, no `*`).
+      local_source <- paste0(
+        "^('(self|none|unsafe-inline|unsafe-eval|wasm-unsafe-eval|unsafe-hashes)'",
+        "|'(nonce|sha256|sha384|sha512)-[^']+'|(blob|data):)$"
+      )
+      for (name in csp_fetch_directives) {
+        tokens <- directive(name)
+        if (is.null(tokens)) next
+        loose <- tokens[!grepl(local_source, tokens)]
+        if (length(loose) > 0L) {
+          add(violation(file, 1L, "csp-fetch-src", paste0(name, ": ", paste(loose, collapse = " "))))
+        }
+      }
     }
   }
   if (length(out) == 0L) NULL else do.call(rbind, out)
@@ -164,10 +196,12 @@ check_site_privacy <- function(dir, allowed_navigation = character(0), allowed_r
                                csp_dir = NULL,
                                skip_dirs = c("shinylive", "deps", "node_modules", ".git"),
                                skip_files = c("search.json", "sitemap.xml", "pkgdown.yml", "pkgdown.js", "lightswitch.js", "katex-auto.js", "shinylive-sw.js")) {
+  # `skip_files` are paths from `dir` (the site root, where pkgdown and the
+  # Shinylive export put them), not names to skip wherever they turn up.
   files <- list.files(dir, recursive = TRUE, full.names = TRUE, all.files = TRUE)
   rel <- substring(files, nchar(dir) + 2L)
   parts <- strsplit(rel, "/", fixed = TRUE)
-  skip <- vapply(parts, function(p) any(p[-length(p)] %in% skip_dirs), logical(1)) | basename(files) %in% skip_files
+  skip <- vapply(parts, function(p) any(p[-length(p)] %in% skip_dirs), logical(1)) | rel %in% skip_files
   files <- files[!skip]
   rel <- rel[!skip]
   keep <- grepl("\\.(html?|js|mjs|css|R|json)$", files, ignore.case = TRUE)
@@ -186,6 +220,7 @@ check_site_privacy <- function(dir, allowed_navigation = character(0), allowed_r
       v <- rbind(
         scan_patterns(body, js_patterns, rel[i]),
         scan_patterns(body, r_patterns, rel[i]),
+        if (ext == "r") scan_patterns(body, r_code_patterns, rel[i]),
         scan_origins(body, allowed, rel[i])
       )
     }
@@ -219,10 +254,28 @@ check_site_privacy_selftest <- function() {
     "<html><head><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; connect-src 'self' https://evil.example\"></head></html>",
     file.path(d, "app", "loose.html")
   )
+  csp_page <- function(csp) {
+    sprintf("<html><head><meta http-equiv=\"Content-Security-Policy\" content=\"%s\"></head></html>", csp)
+  }
+  writeLines(csp_page("default-src 'self'; script-src 'self' https://evil.example; connect-src 'self' blob: data:"),
+             file.path(d, "app", "loose_script.html"))
+  writeLines(csp_page("default-src 'self'; worker-src *; connect-src 'self' blob: data:"),
+             file.path(d, "app", "loose_worker.html"))
+  writeLines("library(httr2)", file.path(d, "bad_httr2.R"))
+  writeLines("con <- url(u)", file.path(d, "bad_url.R"))
+  writeLines("resp <- request(u)", file.path(d, "bad_request.R"))
+  writeLines("out <- req |> req_perform()", file.path(d, "bad_perform.R"))
+  # A vendored file is skipped by its path from the root; the same name in
+  # another place is scanned.
+  writeLines("fetch('/x')", file.path(d, "pkgdown.js"))
+  writeLines("fetch('/x')", file.path(d, "app", "pkgdown.js"))
   bad <- check_site_privacy(d, allowed_navigation = "https://ok.example", csp_dir = "app")
   expected <- c(
     "external-resource" = "page.html", "network-call" = "bad.js", "unlisted-origin" = "bad.js",
-    "network-call" = "bad.R", "csp-missing" = "app/index.html", "csp-connect-src" = "app/loose.html"
+    "network-call" = "bad.R", "csp-missing" = "app/index.html", "csp-connect-src" = "app/loose.html",
+    "csp-fetch-src" = "app/loose_script.html", "csp-fetch-src" = "app/loose_worker.html",
+    "network-call" = "bad_httr2.R", "network-call" = "bad_url.R", "network-call" = "bad_request.R",
+    "network-call" = "bad_perform.R", "network-call" = "app/pkgdown.js"
   )
   failed <- character(0)
   for (i in seq_along(expected)) {
@@ -231,12 +284,15 @@ check_site_privacy_selftest <- function() {
     }
   }
   if (!any(bad$rule == "network-call" & bad$file == "page.html")) failed <- c(failed, "inline fetch() in page.html not detected")
+  if (any(bad$file == "pkgdown.js")) failed <- c(failed, "the vendored pkgdown.js at the root was scanned")
 
   clean <- tempfile("privacy_selftest_clean")
   dir.create(file.path(clean, "app"), recursive = TRUE)
   on.exit(unlink(clean, recursive = TRUE), add = TRUE)
   writeLines("<html><head><script src=\"app.js\"></script><a href=\"https://elsewhere.example\">x</a></head></html>", file.path(clean, "ok.html"))
   writeLines("var x = 1; // a link: https://ok.example/page", file.path(clean, "ok.js"))
+  writeLines("fetch('/search.json')", file.path(clean, "pkgdown.js"))
+  writeLines("a { background: url(logo.png) }", file.path(clean, "ok.css"))
   writeLines(
     "<html><head><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; connect-src 'self' blob: data:\"></head></html>",
     file.path(clean, "app", "index.html")

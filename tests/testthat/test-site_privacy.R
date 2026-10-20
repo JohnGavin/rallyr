@@ -125,3 +125,40 @@ test_that("a folder with nothing to scan is reported as such, not as clean", {
   writeLines("x", file.path(dir, "notes.txt"))
   expect_equal(attr(env$check_site_privacy(dir), "n_files"), 0L)
 })
+
+test_that("every fetch directive of the policy is checked, not only connect-src", {
+  env <- load_checker()
+  csp <- trimws(readLines(system.file("app", "csp.txt", package = "rallyr"), warn = FALSE))
+  page <- function(content) {
+    dir <- withr::local_tempdir(.local_envir = parent.frame())
+    dir.create(file.path(dir, "app"))
+    writeLines(sprintf('<html><head><meta http-equiv="Content-Security-Policy" content="%s"></head></html>', content),
+               file.path(dir, "app", "index.html"))
+    dir
+  }
+  for (swap in list(
+    c("script-src 'self'", "script-src 'self' https://evil.example"),
+    c("worker-src 'self' blob:", "worker-src *"),
+    c("img-src 'self' data: blob:", "img-src https:"),
+    c("frame-src 'self' blob:", "frame-src evil.example")
+  )) {
+    loose <- sub(swap[1], swap[2], csp, fixed = TRUE)
+    expect_false(identical(loose, csp), info = swap[1])
+    expect_true("csp-fetch-src" %in% env$check_site_privacy(page(loose), csp_dir = "app")$rule, info = swap[2])
+  }
+})
+
+test_that("a vendored file is skipped only at its own path, and R code that builds a request is caught", {
+  env <- load_checker()
+  dir <- withr::local_tempdir()
+  dir.create(file.path(dir, "app"))
+  writeLines("fetch('/search.json')", file.path(dir, "pkgdown.js"))
+  writeLines("fetch('/search.json')", file.path(dir, "app", "pkgdown.js"))
+  res <- env$check_site_privacy(dir)
+  expect_identical(res$file, "app/pkgdown.js")
+  for (code in c("library(httr2)", "con <- url(u)", "r <- request(u)", "x |> req_perform()")) {
+    d <- withr::local_tempdir()
+    writeLines(code, file.path(d, "x.R"))
+    expect_true("network-call" %in% env$check_site_privacy(d)$rule, info = code)
+  }
+})
