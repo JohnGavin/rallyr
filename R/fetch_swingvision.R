@@ -263,9 +263,15 @@ sv_time <- function(x) {
 }
 #' Video frame rate used to turn a frame number into elapsed time
 #'
-#' A pinned constant, not a per-recording fit: frame rates are stable across
-#' recordings, so a recording whose timing disagrees with it is a
-#' data-quality signal, not something to absorb (see [sv_video_drift()]).
+#' **Pinned, not fitted per recording.** The value was calibrated once, from
+#' shot frame numbers against shot timestamps across a batch of recordings,
+#' where it held to a fraction of a percent for all but one. That one had a
+#' recording-hardware fault, and an earlier per-recording fit silently
+#' absorbed it into a plausible-looking but wrong rate. Fitting a fresh rate
+#' to each recording therefore hides exactly the fault worth seeing: keep
+#' this constant, and use [sv_video_drift()] to surface a recording whose
+#' timing disagrees with it. Re-derive the constant only from a batch of
+#' recordings, never from one.
 #'
 #' @return A length-1 numeric, frames per second.
 #' @keywords internal
@@ -288,6 +294,59 @@ sv_video_elapsed_sec <- function(hit_frame) {
   f <- sv_num(hit_frame)
   if (is.na(f)) return(NA_real_)
   f / sv_fps()
+}
+
+#' Check a recording's frame timing against the pinned frame rate
+#'
+#' Fits the implied frame rate from `(frame, timestamp)` pairs --
+#' `(frame_last - frame_first) / (time_last - time_first)` over the earliest
+#' and latest pair -- and compares it with [sv_fps()]. It reports a verdict
+#' and never re-fits the pinned rate. Three outcomes:
+#'
+#' * `"PASS"`: the implied rate is within `tol` (relative) of the pinned one.
+#' * `"DRIFT"`: it is not; treat the recording as a data-quality problem.
+#' * `"INDETERMINATE"`: too few usable pairs, or pairs too close in time, to
+#'   say; `reason` says why. This is not a pass.
+#'
+#' @param frame Numeric frame numbers (`hit_frame`).
+#' @param started_at `POSIXct` timestamps of the same shots, same length.
+#' @param tol Relative tolerance, default 1%.
+#' @param min_pairs Minimum usable (non-`NA`) pairs, default 2.
+#' @param min_span_sec Minimum time between the earliest and latest pair, in
+#'   seconds, default 60: over a shorter span timestamp noise swamps the fit.
+#' @return A one-row tibble: `status`, `implied_fps` (`NA` if
+#'   indeterminate), `pinned_fps`, `rel_diff` (implied vs pinned, relative),
+#'   `n_pairs`, `reason` (`NA` unless indeterminate).
+#' @export
+sv_video_drift <- function(frame, started_at, tol = 0.01, min_pairs = 2L, min_span_sec = 60) {
+  if (length(frame) != length(started_at)) {
+    cli::cli_abort(c(
+      "x" = "{.arg frame} and {.arg started_at} must have the same length.",
+      "i" = "Got {length(frame)} and {length(started_at)}."
+    ))
+  }
+  pinned <- sv_fps()
+  t <- as.numeric(started_at)
+  ok <- !is.na(frame) & !is.na(t)
+  frame <- as.numeric(frame)[ok]
+  t <- t[ok]
+  result <- function(status, implied = NA_real_, reason = NA_character_) {
+    tibble::tibble(
+      status = status, implied_fps = implied, pinned_fps = pinned,
+      rel_diff = implied / pinned - 1, n_pairs = length(t), reason = reason
+    )
+  }
+  if (length(t) < min_pairs) {
+    return(result("INDETERMINATE", reason = sprintf("%d usable pairs, need %d", length(t), min_pairs)))
+  }
+  first <- which.min(t)
+  last <- which.max(t)
+  span <- t[last] - t[first]
+  if (span < min_span_sec) {
+    return(result("INDETERMINATE", reason = sprintf("pairs span %.1f s, need %.0f s", span, min_span_sec)))
+  }
+  implied <- (frame[last] - frame[first]) / span
+  result(if (abs(implied / pinned - 1) <= tol) "PASS" else "DRIFT", implied)
 }
 
 #' Net-clearance height, in metres, from a shot's `net_location`

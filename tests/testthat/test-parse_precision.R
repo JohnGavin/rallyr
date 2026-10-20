@@ -95,3 +95,50 @@ test_that("fmt_video_time() gives m:ss, then h:mm:ss past an hour (#18)", {
   expect_equal(fmt_video_time(c(0, 5, 65, 599.6, 3599, 3600, 3725, NA)),
                c("0:00", "0:05", "1:05", "10:00", "59:59", "1:00:00", "1:02:05", "-"))
 })
+
+# ---- pinned frame rate and drift check (rallyr#27) -------------------------
+
+drift_pairs <- function(fps, n = 20, span = 600) {
+  t <- as.POSIXct("2000-01-01 10:00:00", tz = "UTC") + seq(0, span, length.out = n)
+  list(frame = round(as.numeric(t - t[1], units = "secs") * fps), started_at = t)
+}
+
+test_that("sv_fps() is a single pinned constant near 60 (#27)", {
+  expect_length(sv_fps(), 1L)
+  expect_equal(sv_fps(), 60, tolerance = 0.01)
+})
+
+test_that("sv_video_drift() reports PASS when timing matches the pinned rate (#27)", {
+  p <- drift_pairs(sv_fps())
+  out <- sv_video_drift(p$frame, p$started_at)
+  expect_equal(out$status, "PASS")
+  expect_equal(out$implied_fps, sv_fps(), tolerance = 1e-3)
+  expect_equal(out$n_pairs, 20L)
+})
+
+test_that("sv_video_drift() reports DRIFT for a recording at a different rate (#27)", {
+  p <- drift_pairs(sv_fps() * 0.964)  # a few percent slow
+  out <- sv_video_drift(p$frame, p$started_at)
+  expect_equal(out$status, "DRIFT")
+  expect_equal(out$implied_fps, sv_fps() * 0.964, tolerance = 1e-3)
+  expect_gt(abs(out$rel_diff), 0.01)
+  # a looser tolerance accepts it: the tolerance is the only thing that changed
+  expect_equal(sv_video_drift(p$frame, p$started_at, tol = 0.05)$status, "PASS")
+})
+
+test_that("sv_video_drift() is INDETERMINATE when it cannot tell (#27)", {
+  p <- drift_pairs(sv_fps())
+  # too few pairs
+  one <- sv_video_drift(p$frame[1], p$started_at[1])
+  expect_equal(one$status, "INDETERMINATE")
+  expect_true(is.na(one$implied_fps))
+  expect_match(one$reason, "pairs")
+  # pairs too close together in time to fit a rate
+  short <- drift_pairs(sv_fps(), span = 5)
+  expect_equal(sv_video_drift(short$frame, short$started_at)$status, "INDETERMINATE")
+  # missing values are dropped before counting
+  na_f <- p$frame; na_f[-1] <- NA
+  expect_equal(sv_video_drift(na_f, p$started_at)$status, "INDETERMINATE")
+  # mismatched lengths are an error, not a verdict
+  expect_error(sv_video_drift(p$frame, p$started_at[-1]))
+})

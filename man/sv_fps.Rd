@@ -10,8 +10,14 @@ sv_fps()
 A length-1 numeric, frames per second.
 }
 \description{
-A pinned constant, not a per-recording fit: frame rates are stable across
-recordings, so a recording whose timing disagrees with it is a
-data-quality signal, not something to absorb (see \code{\link[=sv_video_drift]{sv_video_drift()}}).
+\strong{Pinned, not fitted per recording.} The value was calibrated once, from
+shot frame numbers against shot timestamps across a batch of recordings,
+where it held to a fraction of a percent for all but one. That one had a
+recording-hardware fault, and an earlier per-recording fit silently
+absorbed it into a plausible-looking but wrong rate. Fitting a fresh rate
+to each recording therefore hides exactly the fault worth seeing: keep
+this constant, and use \code{\link[=sv_video_drift]{sv_video_drift()}} to surface a recording whose
+timing disagrees with it. Re-derive the constant only from a batch of
+recordings, never from one.
 }
 \keyword{internal}
