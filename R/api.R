@@ -108,8 +108,17 @@ rallyr_api_schema <- function() {
   )
 }
 
-# Check a result against the schema, coerce to the declared types, stamp it.
-# A missing or extra column is an error, never a silent pass-through.
+# The schema type name of a column ("POSIXct", "Date", else its first class).
+api_col_type <- function(v) {
+  if (inherits(v, "POSIXct")) "POSIXct" else if (inherits(v, "Date")) "Date" else class(v)[1]
+}
+
+# Check a result against the schema and stamp it. A missing, extra or retyped
+# column is an error, never a silent pass-through or coercion. Two lossless
+# allowances only: an integer column is widened where "numeric" is declared
+# (the database returns whole counts as integer or double depending on the
+# data), and a column that is entirely `NA` and untyped (logical) is given its
+# declared type, since R has no other way to say "no values" for it.
 api_stamp <- function(x, fn) {
   spec <- api_schema_spec()[[fn]]
   if (is.null(spec)) {
@@ -125,14 +134,25 @@ api_stamp <- function(x, fn) {
     ))
   }
   x <- tibble::as_tibble(x)[, names(spec)]
-  for (col in names(spec)) {
+  got <- vapply(x, api_col_type, character(1))
+  untyped_na <- vapply(x, function(v) is.logical(v) && all(is.na(v)), logical(1))
+  widen <- got == "integer" & spec == "numeric"
+  bad <- names(spec)[got != spec & !widen & !(untyped_na & spec != "logical")]
+  if (length(bad) > 0L) {
+    cli::cli_abort(c(
+      "x" = "{.fn {fn}} output no longer matches its schema.",
+      "i" = "Wrong type: {.val {paste0(bad, ' (', got[bad], ', expected ', spec[bad], ')')}}.",
+      "i" = "A shape change needs a minor version bump and a new {.fn rallyr_schema_version}; see {.help rallyr-api}."
+    ))
+  }
+  for (col in names(spec)[widen]) x[[col]] <- as.numeric(x[[col]])
+  for (col in names(spec)[untyped_na & spec != "logical"]) {
     x[[col]] <- switch(spec[[col]],
-      character = as.character(x[[col]]),
-      numeric = as.numeric(x[[col]]),
-      integer = as.integer(x[[col]]),
-      logical = as.logical(x[[col]]),
-      Date = as.Date(x[[col]]),
-      POSIXct = if (inherits(x[[col]], "POSIXct")) x[[col]] else as.POSIXct(x[[col]], tz = "UTC")
+      character = NA_character_[seq_len(nrow(x))],
+      numeric = NA_real_[seq_len(nrow(x))],
+      integer = NA_integer_[seq_len(nrow(x))],
+      Date = as.Date(NA)[seq_len(nrow(x))],
+      POSIXct = as.POSIXct(NA, tz = "UTC")[seq_len(nrow(x))]
     )
   }
   attr(x, "schema_version") <- rallyr_schema_version()

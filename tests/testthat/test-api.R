@@ -63,6 +63,20 @@ test_that("shape drift is refused, not passed through silently (#8)", {
   expect_error(api_stamp(good, "rallyr_not_a_function"), "rallyr_not_a_function")
 })
 
+test_that("a column type change, an extra column and a dropped column abort (#8)", {
+  good <- rallyr_net_clearance(con)
+  retyped <- good
+  retyped$me_n <- as.numeric(retyped$me_n)
+  expect_error(api_stamp(retyped, "rallyr_net_clearance"), "me_n")
+  as_chr <- good
+  as_chr$diff_m <- as.character(as_chr$diff_m)
+  expect_error(api_stamp(as_chr, "rallyr_net_clearance"), "diff_m")
+  extra <- good
+  extra$surprise <- 1
+  expect_error(api_stamp(extra, "rallyr_net_clearance"), "surprise")
+  expect_error(api_stamp(good[, setdiff(names(good), "diff_m")], "rallyr_net_clearance"), "diff_m")
+})
+
 test_that("dq_params can be passed through to the API (#8)", {
   p <- dq_params()
   p$max_rally_strokes$default <- 1
