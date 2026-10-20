@@ -19,6 +19,12 @@ tennis_db_connect <- function(path = "tennis.duckdb") {
 #' segments per `match_id`) works the same way — every existing row for that
 #' key is deleted, then all of the new rows are appended.
 #'
+#' A column in `matches` that the stored table does not have yet is added
+#' first (`ALTER TABLE ... ADD COLUMN`, existing rows get `NULL`), so a parser
+#' that gains a field does not break an update against an older database.
+#' Existing columns are never dropped or retyped; a column missing from
+#' `matches` stays in the table with `NULL` for the new rows.
+#'
 #' @param con A DBI connection from [tennis_db_connect()].
 #' @param matches A tibble from [fetch_swingvision()] (or [parse_swingvision()]
 #'   with `key = "played_at"`), or any other tibble to upsert into `table`.
@@ -39,6 +45,21 @@ tennis_db_upsert <- function(con, matches, key = "match_id", table = "matches") 
   if (!DBI::dbExistsTable(con, table)) {
     DBI::dbWriteTable(con, table, matches)
     return(invisible(nrow(matches)))
+  }
+
+  # Additive schema step: a column the stored table lacks is added (existing
+  # rows get NULL). Existing columns are never dropped or retyped (rallyr#7).
+  missing_cols <- setdiff(names(matches), DBI::dbListFields(con, table))
+  for (col in missing_cols) {
+    DBI::dbExecute(
+      con,
+      sprintf(
+        "ALTER TABLE %s ADD COLUMN %s %s",
+        DBI::dbQuoteIdentifier(con, table),
+        DBI::dbQuoteIdentifier(con, col),
+        DBI::dbDataType(con, matches[[col]])
+      )
+    )
   }
 
   keys <- unique(matches[[key]])
