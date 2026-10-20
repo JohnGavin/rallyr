@@ -111,6 +111,23 @@ matches <- parse_swingvision(pasted_text)
 - Does **not** yet provide a dashboard or web UI, or a vignette — planned
   (see Roadmap below), not yet built.
 
+## API and stability
+
+Derived data is read through five functions that take a database connection
+and return tibbles stamped with a `schema_version` attribute:
+`rallyr_sessions()`, `rallyr_corrected_rallies()`, `rallyr_session_metrics()`,
+`rallyr_net_clearance()` and `rallyr_stroke_quality()`. Their columns and
+types are listed once in `rallyr_api_schema()`, and each result is checked
+against that list before it is returned. See `?"rallyr-api"`.
+
+Policy before 1.0: any change to an output shape (a column added, removed,
+renamed, retyped or reordered, or its meaning changed) bumps the **minor**
+version and `rallyr_schema_version()`, and is listed in `NEWS.md`; a patch
+release never changes a shape. Recalibrating a `dq_params()` threshold changes
+values, not shapes, and is noted in `NEWS.md`; pass `params` to pin the
+thresholds an analysis used. Functions outside that list are not covered. There
+is no HTTP layer: one would be built only once a real non-R consumer exists.
+
 ## Roadmap
 
 Recorded 2026-09-04, not yet implemented:
