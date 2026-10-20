@@ -15,9 +15,11 @@
 #' - `clearance_m`: median net clearance, after [dq_clean_net_clearance()].
 #'
 #' Each is standardised across the sessions supplied (z-score; a component
-#' with no variation, or a single session, standardises to 0, never `NaN`),
-#' so the scores are relative to the history passed in, and adding a session
-#' changes earlier values. The composite `quality` is the weighted mean of the
+#' with no variation across two or more sessions standardises to 0, never
+#' `NaN`; a component present in fewer than two sessions has no spread to
+#' standardise against, so its z-score is `NA`, not 0), so the scores are
+#' relative to the history passed in, and adding a session changes earlier
+#' values. With one session, `quality` is therefore `NA`. The composite `quality` is the weighted mean of the
 #' standardised components that are present for that session; a missing
 #' component is left out and the weights renormalised, and `quality` is `NA`
 #' when no weighted component is present. Weights are `weights`, by default
@@ -115,12 +117,14 @@ stroke_quality_session <- function(shot_detail, matches, params = dq_params(),
   tibble::as_tibble(sq)
 }
 
-# z-score; no variation (or one value) -> 0 for present values, NA stays NA.
+# z-score; NA everywhere when fewer than 2 sessions have a value (no spread to
+# standardise against, so 0 would be a claim); no variation across 2 or more
+# -> 0 for present values; NA stays NA.
 quality_z <- function(x) {
   ok <- !is.na(x)
   out <- rep(NA_real_, length(x))
-  if (!any(ok)) return(out)
-  s <- if (sum(ok) > 1L) stats::sd(x[ok]) else 0
+  if (sum(ok) < 2L) return(out)
+  s <- stats::sd(x[ok])
   out[ok] <- if (is.na(s) || s == 0) 0 else (x[ok] - mean(x[ok])) / s
   out
 }
@@ -135,7 +139,8 @@ quality_z <- function(x) {
 #'
 #' @param sq Output of [stroke_quality_session()] (needs `session_date` and
 #'   `quality`).
-#' @param windows Integer window sizes, by default 1, 2, 4 and 8 sessions.
+#' @param windows Window sizes in sessions, by default 1, 2, 4 and 8: unique,
+#'   finite whole numbers of at least 1 (anything else is an error).
 #' @return A tibble, one row per session and window: `session_date`,
 #'   `window`, `current`, `baseline`, `delta`.
 #' @export
@@ -143,8 +148,11 @@ stroke_quality_trend <- function(sq, windows = c(1, 2, 4, 8)) {
   if (!all(c("session_date", "quality") %in% names(sq))) {
     cli::cli_abort("{.arg sq} needs {.field session_date} and {.field quality}.")
   }
-  if (!is.numeric(windows) || anyNA(windows) || any(windows < 1)) {
-    cli::cli_abort("{.arg windows} must be positive whole numbers.")
+  if (!is.numeric(windows) || length(windows) < 1L || !all(is.finite(windows)) ||
+        any(windows < 1) || any(windows != round(windows)) || anyDuplicated(windows) > 0L) {
+    cli::cli_abort(c(
+      "x" = "{.arg windows} must be unique, finite whole numbers of at least 1."
+    ))
   }
   sq <- sq[order(sq$session_date), ]
   n <- nrow(sq)
