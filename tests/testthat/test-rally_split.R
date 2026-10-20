@@ -51,7 +51,9 @@ test_that("dq_params() carries the neutral starter-rule parameter", {
   expect_true(p$split_requires_starter_next)
   expect_named(p, c("max_mean_stroke_speed_kmh", "max_individual_stroke_speed_kmh", "min_segment_duration_min",
                     "max_rally_strokes", "max_stroke_gap_sec", "pause_split_regimes", "sentinel_shot_speeds_mph",
-                    "split_requires_starter_next"), ignore.order = TRUE)
+                    "split_requires_starter_next",
+                    "min_net_clearance_m", "max_net_clearance_m", "stroke_quality_weights"),
+               ignore.order = TRUE)
   expect_setequal(p$pause_split_regimes, c("forehand_cross_court", "backhand_cross_court", "net_volley"))
 })
 
