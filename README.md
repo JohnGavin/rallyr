@@ -120,10 +120,12 @@ and return tibbles stamped with a `schema_version` attribute:
 types are listed once in `rallyr_api_schema()`, and each result is checked
 against that list before it is returned. See `?"rallyr-api"`.
 
-Policy before 1.0: any change to an output shape (a column added, removed,
-renamed, retyped or reordered, or its meaning changed) bumps the **minor**
-version and `rallyr_schema_version()`, and is listed in `NEWS.md`; a patch
-release never changes a shape. Recalibrating a `dq_params()` threshold changes
+Policy, applying from 0.1.0 (the first public release; the package is
+pre-1.0 and until then shapes may still change, pinned by a test against
+`rallyr_schema_version()`): any change to an output shape (a column added,
+removed, renamed, retyped or reordered, or its meaning changed) bumps the
+**minor** version and `rallyr_schema_version()`, and is listed in `NEWS.md`;
+a patch release then never changes a shape. Recalibrating a `dq_params()` threshold changes
 values, not shapes, and is noted in `NEWS.md`; pass `params` to pin the
 thresholds an analysis used. Functions outside that list are not covered. There
 is no HTTP layer: one would be built only once a real non-R consumer exists.

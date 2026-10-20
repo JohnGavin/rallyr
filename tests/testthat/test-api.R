@@ -87,3 +87,23 @@ test_that("dq_params can be passed through to the API (#8)", {
   loose <- rallyr_corrected_rallies(con)
   expect_lt(nrow(strict), nrow(loose))
 })
+
+# A frozen fingerprint of the schema per schema version. Changing any column
+# name, type or order changes the fingerprint and fails the second expectation;
+# the fix is to bump rallyr_schema_version() (and the package minor version),
+# add a NEWS.md entry and add the new version's fingerprint here. Bumping the
+# version without a fingerprint fails the first expectation.
+schema_fingerprint <- function() {
+  s <- rallyr_api_schema()
+  rlang::hash(paste(s$fn, s$column, s$type, sep = ":", collapse = "\n"))
+}
+
+test_that("the schema spec is frozen per schema version (#8)", {
+  frozen <- c("0.1" = "d640eb333233657cd4c01821860b918d")
+  v <- rallyr_schema_version()
+  expect_true(v %in% names(frozen), label = paste("a fingerprint for schema version", v))
+  expect_identical(
+    schema_fingerprint(), unname(frozen[v]),
+    label = paste("schema fingerprint at version", v, "(spec changed: bump the version)")
+  )
+})

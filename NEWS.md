@@ -62,4 +62,6 @@
 * `rallyr_sessions()`, `rallyr_corrected_rallies()`, `rallyr_session_metrics()`,
   `rallyr_net_clearance()`, `rallyr_stroke_quality()`, `rallyr_api_schema()`
   and `rallyr_schema_version()`: a documented interface for derived data with
-  a stability policy (`?"rallyr-api"`).
+  a stability policy (`?"rallyr-api"`) that applies from 0.1.0, the first
+  public release. A result with a retyped, extra or missing column is an
+  error, and a test pins the schema to `rallyr_schema_version()`.
