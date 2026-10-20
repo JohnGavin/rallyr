@@ -62,6 +62,12 @@
 #' from the per-bin `min_shots_per_bin`, which filters single one-minute bins
 #' before they are merged.
 #'
+#' `min_drill_gap_sec` (60) and `min_drill_segment_shots` (10) drive
+#' [segment_session_drills()]: a pause of at least that many seconds between
+#' two strokes is a drill transition, and a segment of fewer strokes than the
+#' second value is a stray and merged away. Both are starting values for one
+#' kind of routine; check them against your own gap distribution.
+#'
 #' `sentinel_shot_speeds_mph` lists vendor speed readings that are a fixed
 #' fallback value, not a measurement: the same exact value repeated across
 #' unrelated shots, with a large gap to the next genuine reading. They are
@@ -70,7 +76,8 @@
 #'
 #' @return A named list: `max_mean_stroke_speed_kmh` (numeric),
 #'   `max_individual_stroke_speed_kmh` (numeric),
-#'   `min_segment_duration_min` (numeric),
+#'   `min_segment_duration_min` (numeric), `min_drill_gap_sec` (numeric),
+#'   `min_drill_segment_shots` (numeric),
 #'   `sentinel_shot_speeds_mph` (numeric -- known placeholder speeds),
 #'   `max_rally_strokes` (a named list with `default`, `mini_tennis`,
 #'   `forehand_cross_court` and `backhand_cross_court`; the "me" side's
@@ -86,6 +93,8 @@ dq_params <- function() {
     max_mean_stroke_speed_kmh = 100,
     max_individual_stroke_speed_kmh = 160,
     min_segment_duration_min = 3,
+    min_drill_gap_sec = 60,
+    min_drill_segment_shots = 10,
     sentinel_shot_speeds_mph = 117.1,
     max_rally_strokes = list(
       default = 25, mini_tennis = 50,
