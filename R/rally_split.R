@@ -1,12 +1,11 @@
 #' Find within-rally split points from stroke timing gaps
 #'
 #' A rally's shots are grouped by the SwingVision API's own `pid` field,
-#' taken as-is with no time-gap heuristic (see issue #3). This can
+#' taken as-is with no time-gap heuristic. This can
 #' silently merge two or more real rallies into one `pid` run when play
 #' actually stopped and restarted between them, producing an implausible
-#' stroke count for a single continuous point (see issue #5, point 4:
-#' "the actual re-grouping/splitting algorithm for a flagged over-long
-#' rally... Not yet solved").
+#' stroke count for a single continuous point; the pause rule in [dq_params()] is the
+#' calibrated response.
 #'
 #' This is a **pure, dependency-free** function: given ordered per-stroke
 #' timestamps for ONE rally, it finds the point(s) where the pause between
@@ -30,7 +29,7 @@
 #' @param max_gap_sec Numeric threshold in seconds. A gap strictly greater
 #'   than this is treated as a likely rally boundary. Not derived by this
 #'   function — pass the project's calibrated threshold (see
-#'   issue #5).
+#'   [dq_params()]).
 #' @param is_starter Optional logical vector, same length as `started_at`:
 #'   `TRUE` where the stroke belongs to the rally starter (the feeder). When
 #'   supplied, a gap only counts as a boundary if the stroke AFTER it is the

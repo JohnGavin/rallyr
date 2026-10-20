@@ -24,7 +24,7 @@ not required for it to work against the current schema.}
 \item{max_gap_sec}{Numeric threshold in seconds. A gap strictly greater
 than this is treated as a likely rally boundary. Not derived by this
 function — pass the project's calibrated threshold (see
-issue #5).}
+\code{\link[=dq_params]{dq_params()}}).}
 
 \item{is_starter}{Optional logical vector, same length as \code{started_at}:
 \code{TRUE} where the stroke belongs to the rally starter (the feeder). When
@@ -43,12 +43,11 @@ is supplied), or when fewer than 2 strokes are supplied.
 }
 \description{
 A rally's shots are grouped by the SwingVision API's own \code{pid} field,
-taken as-is with no time-gap heuristic (see issue #3). This can
+taken as-is with no time-gap heuristic. This can
 silently merge two or more real rallies into one \code{pid} run when play
 actually stopped and restarted between them, producing an implausible
-stroke count for a single continuous point (see issue #5, point 4:
-"the actual re-grouping/splitting algorithm for a flagged over-long
-rally... Not yet solved").
+stroke count for a single continuous point; the pause rule in \code{\link[=dq_params]{dq_params()}} is the
+calibrated response.
 }
 \details{
 This is a \strong{pure, dependency-free} function: given ordered per-stroke

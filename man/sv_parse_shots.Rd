@@ -17,7 +17,7 @@ A tibble, one row per shot, sorted by \code{started_at} ascending.
 Pure function over an already-fetched JSON list (no network) so it is unit
 testable against committed fixtures. \code{spin_type} is categorical (e.g.
 \code{flat}/\code{topspin}/\code{slice}) -- there is no numeric spin-rate field in this
-endpoint (see issue #1).
+endpoint (see rallyr#2).
 }
 \details{
 \code{shot_in} is derived from \code{net_type}/\code{bounce_location_long}/

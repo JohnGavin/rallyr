@@ -13,9 +13,8 @@ fmt_speed_mph <- function(mph) {
 
 #' Format decimal minutes as "Xm YYs" (minutes and seconds, never a decimal)
 #'
-#' Single source of truth for drill-duration display (issue #40 -- "how
-#' long each drill lasts in minutes and seconds", not decimal minutes like
-#' "7.5"). Used as a `scale_*_continuous(labels = fmt_mmss)` axis formatter
+#' Single source of truth for drill-duration display (how long each
+#' drill lasts, in minutes and seconds, not decimal minutes like "7.5"). Used as a `scale_*_continuous(labels = fmt_mmss)` axis formatter
 #' in `scripts/make_artifact_charts.R`'s duration charts, and available for
 #' any other duration display that should read the same way.
 #'

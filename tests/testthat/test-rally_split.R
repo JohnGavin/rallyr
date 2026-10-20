@@ -49,7 +49,9 @@ test_that("rally_split_gap_sec() is per regime and NA where no pause split appli
 test_that("dq_params() carries the neutral starter-rule parameter", {
   p <- dq_params()
   expect_true(p$split_requires_starter_next)
-  expect_null(p$split_requires_coach_next)
+  expect_named(p, c("max_mean_stroke_speed_kmh", "max_individual_stroke_speed_kmh", "min_segment_duration_min",
+                    "max_rally_strokes", "max_stroke_gap_sec", "pause_split_regimes",
+                    "split_requires_starter_next"), ignore.order = TRUE)
   expect_setequal(p$pause_split_regimes, c("forehand_cross_court", "backhand_cross_court", "net_volley"))
 })
 
