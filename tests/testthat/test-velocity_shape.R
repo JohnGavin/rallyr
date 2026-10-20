@@ -56,3 +56,23 @@ test_that("empty input and missing columns", {
   expect_error(dq_velocity_shape_rates(mk_vel(1, 1, 1), by = "nope"), "nope")
   expect_error(dq_velocity_shape_rates(mk_vel(1, 1, 1), tol = -1), "tol")
 })
+
+test_that("non-finite components are unusable and never give an NA status", {
+  s <- mk_vel(c(5, Inf, 1), c(5, Inf, 2), c(5, Inf, 3))
+  out <- dq_velocity_shape_rates(s, by = character(0), min_usable = 1)
+  expect_equal(out$n_strokes, 3L)
+  expect_equal(out$n_usable, 2L)
+  expect_equal(out$n_replicated, 1L)
+  expect_false(anyNA(out$status))
+  expect_true(out$status %in% c("PRESENT", "ABSENT", "INDETERMINATE"))
+  inf_only <- mk_vel(Inf, -Inf, 1)
+  res <- dq_velocity_shape_rates(inf_only, by = character(0), min_usable = 1)
+  expect_equal(res$status, "INDETERMINATE")
+})
+
+test_that("min_usable must be a single positive whole number", {
+  s <- mk_vel(1, 1, 1)
+  for (bad in list(0, -1, NA, 1.5, c(1, 2), "a", NULL)) {
+    expect_error(dq_velocity_shape_rates(s, min_usable = bad), "min_usable")
+  }
+})

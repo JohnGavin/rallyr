@@ -42,8 +42,8 @@ once stroke type is held fixed (group by both, as the default does).
 }
 \details{
 A stroke is \strong{replicated} when the largest difference between its three
-components is at most \code{tol}. A stroke with any missing component is not
-usable and is neither counted as replicated nor as not. An all-zero vector
+components is at most \code{tol}. A stroke with any missing or non-finite component is
+not usable and is neither counted as replicated nor as not. An all-zero vector
 counts as replicated (its components are equal); check separately whether
 you want zero vectors treated as missing.
 

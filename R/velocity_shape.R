@@ -9,8 +9,8 @@
 #' once stroke type is held fixed (group by both, as the default does).
 #'
 #' A stroke is **replicated** when the largest difference between its three
-#' components is at most `tol`. A stroke with any missing component is not
-#' usable and is neither counted as replicated nor as not. An all-zero vector
+#' components is at most `tol`. A stroke with any missing or non-finite component is
+#' not usable and is neither counted as replicated nor as not. An all-zero vector
 #' counts as replicated (its components are equal); check separately whether
 #' you want zero vectors treated as missing.
 #'
@@ -47,10 +47,14 @@ dq_velocity_shape_rates <- function(shots, by = c("hit_type", "player"),
   if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) || tol < 0) {
     cli::cli_abort("{.arg tol} must be a single non-negative number.")
   }
+  if (!is.numeric(min_usable) || length(min_usable) != 1L || is.na(min_usable) ||
+        !is.finite(min_usable) || min_usable < 1 || min_usable != round(min_usable)) {
+    cli::cli_abort("{.arg min_usable} must be a single positive whole number.")
+  }
   x <- shots[[comps[1]]]
   y <- shots[[comps[2]]]
   z <- shots[[comps[3]]]
-  usable <- !is.na(x) & !is.na(y) & !is.na(z)
+  usable <- is.finite(x) & is.finite(y) & is.finite(z)
   spread <- pmax(x, y, z) - pmin(x, y, z)
   d <- shots[, by, drop = FALSE]
   d$.usable <- usable
