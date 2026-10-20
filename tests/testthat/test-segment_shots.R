@@ -47,3 +47,35 @@ test_that("a segment at or above the minimum duration keeps its regime", {
   ))
   expect_equal(regimes(segment_session_shots(shots)), c("mini_tennis", "net_volley", "mini_tennis"))
 })
+
+test_that("min_segment_duration_min is validated", {
+  shots <- mk_session(list(list(minutes = 6, host_hit = "ground_stroke")))
+  expect_error(segment_session_shots(shots, min_segment_duration_min = NA_real_), "min_segment_duration_min")
+  expect_error(segment_session_shots(shots, min_segment_duration_min = -1), "min_segment_duration_min")
+  expect_error(segment_session_shots(shots, min_segment_duration_min = c(1, 2)), "min_segment_duration_min")
+  expect_error(segment_session_shots(shots, min_segment_duration_min = "3"), "min_segment_duration_min")
+})
+
+test_that("adjacent short segments become one gap and segment_index is renumbered", {
+  shots <- mk_session(list(
+    list(minutes = 2, host_hit = "volley"),          # short net_volley
+    list(minutes = 2, host_hit = "ground_stroke"),   # short mini_tennis
+    list(minutes = 6, host_hit = "volley")
+  ))
+  segs <- segment_session_shots(shots)
+  expect_equal(regimes(segs), c("gap", "net_volley"))
+  expect_equal(segs$segment_index, 1:2)
+  expect_equal(segs$n_shots[1], 48L)
+  expect_equal(segs$n_shots[1], segs$n_host_shots[1] + segs$n_guest_shots[1])
+  expect_equal(segs$start_time[1], min(shots$started_at))
+})
+
+test_that("a short final segment is relabelled gap like any other", {
+  shots <- mk_session(list(
+    list(minutes = 6, host_hit = "ground_stroke"),
+    list(minutes = 2, host_hit = "volley")
+  ))
+  segs <- segment_session_shots(shots)
+  expect_equal(regimes(segs), c("mini_tennis", "gap"))
+  expect_equal(segs$segment_index, 1:2)
+})

@@ -45,8 +45,11 @@ detected regime; a shorter segment (not already \code{"gap"}) is relabelled
 \code{"gap"}. Distinct from \code{min_shots_per_bin}, which filters individual
 bins before merging: this catches a short run of bins that each passed
 the bin-level filter but together are too brief to be a real drill
-instance. Default from \code{\link[=dq_params]{dq_params()}}'s \code{min_segment_duration_min} (\code{3});
-pass \code{0} to disable.}
+instance. Applies equally to the final segment of a session. Adjacent
+\code{"gap"} segments (including newly relabelled ones) are merged into one
+and \code{segment_index} is renumbered \verb{1..n}. Must be a single non-negative
+number (\code{NA} or negative is an error). Default from \code{\link[=dq_params]{dq_params()}}'s
+\code{min_segment_duration_min} (\code{3}); pass \code{0} to disable.}
 }
 \value{
 A tibble, one row per detected segment (contiguous bins sharing a
