@@ -30,6 +30,10 @@ bounce/net-derived rate came out 83.6\% (597/714) -- close but not exact,
 so treat \code{shot_in} as directionally reliable per-shot signal, not a
 bit-exact reproduction of the \verb{/stats} endpoint's own count.
 
+\code{shot_in} is unreliable for net contacts: see the "Known unreliability"
+section of \code{\link[=sv_shot_in]{sv_shot_in()}}, and use \code{\link[=flag_net_call_contradicted]{flag_net_call_contradicted()}} to find
+the out calls that continued play contradicts.
+
 \code{rally_id} is the payload's own \code{pid} field, taken as-is (not derived).
 Verified live against \code{sw2-EXAMPLE01}: sorted by \code{started_at}, every \code{pid}
 value forms one contiguous run of shots -- SwingVision already segments
