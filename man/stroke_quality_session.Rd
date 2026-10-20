@@ -12,7 +12,8 @@ stroke_quality_session(
   regimes = c("forehand_cross_court", "backhand_cross_court"),
   me_side = "guest",
   feeder_side = "host",
-  feeder_right_handed = TRUE
+  feeder_right_handed = TRUE,
+  me_right_handed = TRUE
 )
 }
 \arguments{
@@ -30,7 +31,8 @@ and \code{clearance} weights, not all zero.}
 
 \item{me_side, feeder_side}{The \code{player} values for each side.}
 
-\item{feeder_right_handed}{Passed to \code{\link[=cross_court_zone_score]{cross_court_zone_score()}}.}
+\item{feeder_right_handed, me_right_handed}{Passed to
+\code{\link[=cross_court_zone_score]{cross_court_zone_score()}}.}
 }
 \value{
 A tibble, one row per session, ordered by date: \code{session_date},

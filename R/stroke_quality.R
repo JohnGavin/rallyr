@@ -34,7 +34,8 @@
 #'   and `clearance` weights, not all zero.
 #' @param regimes The drills to include.
 #' @param me_side,feeder_side The `player` values for each side.
-#' @param feeder_right_handed Passed to [cross_court_zone_score()].
+#' @param feeder_right_handed,me_right_handed Passed to
+#'   [cross_court_zone_score()].
 #' @return A tibble, one row per session, ordered by date: `session_date`,
 #'   `n_strokes`, `speed_mph`, `zone_score`, `clearance_m`, `z_speed`,
 #'   `z_zone`, `z_clearance` and `quality`.
@@ -43,7 +44,8 @@ stroke_quality_session <- function(shot_detail, matches, params = dq_params(),
                                    weights = params$stroke_quality_weights,
                                    regimes = c("forehand_cross_court", "backhand_cross_court"),
                                    me_side = "guest", feeder_side = "host",
-                                   feeder_right_handed = TRUE) {
+                                   feeder_right_handed = TRUE,
+                                   me_right_handed = TRUE) {
   comps <- c("speed", "zone", "clearance")
   w <- unlist(weights)
   if (!is.numeric(w) || !setequal(names(w), comps) || anyNA(w) || any(w < 0) || sum(w) <= 0) {
@@ -77,7 +79,7 @@ stroke_quality_session <- function(shot_detail, matches, params = dq_params(),
   d$zone <- zone_score_numeric(cross_court_zone_score(
     d$regime, d$player, d$bounce_location_long, d$bounce_location_lat,
     d$next_player, d$next_hit_wing, feeder_right_handed,
-    me_side = me_side, feeder_side = feeder_side
+    me_side = me_side, feeder_side = feeder_side, me_right_handed = me_right_handed
   ))
   d <- dq_clean_shot_speed(d, params)
   d <- dq_clean_net_clearance(d, params)

@@ -33,15 +33,21 @@ one (for example with plumber2) only when a real non-R or remote consumer
 exists.
 }
 
-\subsection{Stability policy (pre-1.0)}{
+\subsection{Stability policy (applies from 0.1.0)}{
+
+The package is pre-1.0 and has not had a public release yet. This policy
+takes effect with the first public release (0.1.0); until then shapes may
+still change, and a test pins the schema to \code{\link[=rallyr_schema_version]{rallyr_schema_version()}} so a
+change cannot go unnoticed.
 \itemize{
 \item \strong{The contract} is the name and arguments of the functions above and the
 name, order and type of each output column (\code{\link[=rallyr_api_schema]{rallyr_api_schema()}}).
 Other exported functions are not covered and may change in any release.
-\item \strong{Any change to an output shape bumps the minor version} (\verb{0.N.0}) and
-\code{\link[=rallyr_schema_version]{rallyr_schema_version()}}, and is listed in \code{NEWS.md}. That includes
-adding, removing, renaming, retyping or reordering a column and changing
-what a column means. A patch release never changes a shape.
+\item \strong{From 0.1.0, any change to an output shape bumps the minor version}
+(\verb{0.N.0}) and \code{\link[=rallyr_schema_version]{rallyr_schema_version()}}, and is listed in \code{NEWS.md}. That
+includes adding, removing, renaming, retyping or reordering a column and
+changing what a column means. From then on a patch release never changes
+a shape.
 \item \strong{Values change without a shape change} when a data-quality threshold is
 recalibrated (\code{\link[=dq_params]{dq_params()}}): more or fewer rows, different values. That is
 expected and noted in \code{NEWS.md}. Pass \code{params} explicitly to pin the
