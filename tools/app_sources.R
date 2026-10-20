@@ -86,3 +86,39 @@ app_write_sources <- function(r_dir, path, entry = app_entry_points()) {
   writeLines(c(header, body), path)
   invisible(cl$names)
 }
+
+# The packages the app's code names: `pkg::name` / `pkg:::name` in the closure
+# and in the app file, and plain `library(pkg)` calls in the app file (a
+# `library(x, character.only = TRUE)` call names no fixed package). Comments
+# and strings are not read as code. Used by tools/build_app.R to decide which
+# WebAssembly packages the export must contain.
+app_package_refs <- function(r_dir, app_file, entry = app_entry_points()) {
+  cl <- app_closure(r_dir, entry)
+  texts <- c(vapply(cl$defs, function(d) d$text, character(1)), paste(readLines(app_file, warn = FALSE), collapse = "\n"))
+  refs <- character(0)
+  for (txt in texts) {
+    exprs <- parse(text = txt, keep.source = TRUE)
+    pd <- utils::getParseData(exprs)
+    refs <- c(refs, pd$text[pd$token == "SYMBOL_PACKAGE"])
+  }
+  app_lines <- readLines(app_file, warn = FALSE)
+  app_lines <- app_lines[!grepl("^\\s*#", app_lines)]
+  libs <- regmatches(app_lines, regexec("^\\s*(?:library|require)\\(\\s*([A-Za-z][A-Za-z0-9.]*)\\s*\\)", app_lines, perl = TRUE))
+  refs <- c(refs, vapply(libs[lengths(libs) > 0L], function(m) m[2], character(1)))
+  sort(unique(refs))
+}
+
+# Packages the Shinylive runtime already holds, so they are not exported as
+# extra WebAssembly packages: R's own, and those preinstalled in the runtime's
+# base library (named in <dest>/shinylive/webr/library.js.metadata). NULL when
+# that file cannot be read (the caller must then say it cannot tell).
+app_runtime_packages <- function(dest) {
+  meta <- file.path(dest, "shinylive", "webr", "library.js.metadata")
+  if (!file.exists(meta)) return(NULL)
+  d <- tryCatch(jsonlite::fromJSON(meta, simplifyVector = FALSE), error = function(e) NULL)
+  if (is.null(d) || length(d$files) == 0L) return(NULL)
+  files <- vapply(d$files, function(f) f$filename, character(1))
+  pre <- unique(sub("^/([^/]+)/DESCRIPTION$", "\\1", grep("^/[^/]+/DESCRIPTION$", files, value = TRUE)))
+  if (length(pre) == 0L) return(NULL)
+  sort(unique(c(pre, rownames(utils::installed.packages(priority = "base")))))
+}

@@ -54,14 +54,26 @@ options(shinylive.quiet = FALSE)
 shinylive::export(app_build, dest, subdir = "app")
 
 # The page must not fetch packages from another site, so the WebAssembly
-# builds of the ones the app uses have to be in the export. Fail the build if
-# they are not (the browser check would fail later, with a longer log).
+# builds of every package the app's code names have to be in the export, unless
+# the Shinylive runtime already holds it. Both lists are derived, not typed:
+# the packages come from the code (tools/app_sources.R) and the runtime's own
+# list from the export. Fail the build if one is missing (the browser check
+# would fail later, with a longer log).
 meta_file <- file.path(dest, "shinylive", "webr", "packages", "metadata.rds")
 bundled <- if (file.exists(meta_file)) names(readRDS(meta_file)) else character(0)
 message("Bundled WebAssembly packages: ", if (length(bundled)) paste(sort(bundled), collapse = ", ") else "(none)")
-needed <- c("ggplot2", "dplyr", "tibble", "scales")
-if (!all(needed %in% bundled)) {
-  message("FAIL: not bundled: ", paste(setdiff(needed, bundled), collapse = ", "),
+runtime <- app_runtime_packages(dest)
+if (is.null(runtime)) {
+  message("INDETERMINATE: cannot read the runtime's own package list under ", dest,
+          "/shinylive/webr, so cannot tell which packages must be bundled.")
+  quit(status = 3)
+}
+named <- app_package_refs(file.path(root, "R"), file.path(app_build, "app.R"))
+needed <- setdiff(named, c(runtime, "rallyr"))
+message("Packages the app names: ", paste(named, collapse = ", "))
+message("Needing a WebAssembly build: ", if (length(needed)) paste(needed, collapse = ", ") else "(none)")
+if (length(needed) == 0L || !all(needed %in% bundled)) {
+  message("FAIL: not bundled: ", if (length(needed) == 0L) "(the derived list is empty, which cannot be right)" else paste(setdiff(needed, bundled), collapse = ", "),
           ". Check the app folder ", app_build, " for what renv::dependencies() sees.")
   quit(status = 1)
 }
