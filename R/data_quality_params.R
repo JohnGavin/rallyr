@@ -236,6 +236,9 @@ dq_flag_rallies <- function(rallies, rally_speed_kmh) {
 #' increases the corrected row count, so that difference can go negative
 #' ("-5 of 937 rallies excluded"). Compute the flagged set once with
 #' [dq_flag_rallies()] and reuse this count for every chart and audit table.
+#' "Excluded" means flagged, i.e. a rally the data-quality checks object to;
+#' it does not mean the rally is absent from [dq_corrected_rallies()], since a
+#' flagged rally can still contribute surviving sub-rallies after a split.
 #'
 #' @param rallies_flagged Output of [dq_flag_rallies()] (needs a
 #'   `flag_reason` column).
