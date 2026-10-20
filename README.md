@@ -133,7 +133,9 @@ The app at <https://johngavin.github.io/rallyr/app/> runs R in your browser
 Privacy: files you choose are read in the browser and are not uploaded. The
 app makes no requests to other sites (no analytics, proxy, fonts or scripts
 from elsewhere). Two checks run on every build: a scan of the code we ship,
-and a real-browser run that fails on any request to another origin.
+and a real-browser run that fails on any request to another origin. The page
+also carries a Content-Security-Policy `<meta>` tag, but that tag does not bind
+the Shinylive frame or the workers: the browser check is the real guarantee.
 
 In R, the same bundle can be built and read without the app:
 

@@ -531,6 +531,11 @@ bundle_empty_tables <- function() {
 
 # Segments, per-shot rows and rallies for one match, in the shape of the
 # stored tables (so the same derived-data functions read either source).
+# NOTE: this repeats the derivation the database pipeline does (segment the
+# shots, label regimes, count wings, collect rallies). The duplicate is
+# deliberate for now: the shared version waits for PR #35, after which this
+# function should call it. Until then the test that compares the two checks
+# consistency with the generator only, not correctness.
 bundle_derive_match <- function(shots, guest_right_handed = TRUE) {
   segs <- segment_session_shots(shots, guest_right_handed = guest_right_handed)
   segs <- segs |>

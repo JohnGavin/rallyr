@@ -87,3 +87,11 @@ First public release (version bumped for the first deployed site).
   `plot_stroke_speed()`, `plot_net_clearance()` and `plot_gap_distribution()`
   (ggplot2, suggested).
 * New dependency: jsonlite. Suggested: ggplot2, shiny, bslib, knitr, rmarkdown.
+* Bundle files are checked more strictly: text that is a URL or a file path is
+  never followed; `fetched_at` must be an ISO-8601 date-time and is compared
+  as an instant (offsets and fractions accepted); a session's `match_id` must
+  equal its match payload id and its shots' ids; a file over 50 MB, or that
+  expands past 50 MB (`options(rallyr.bundle_max_bytes)`), is refused. On a
+  merge, a replaced or unchanged session keeps the incoming `token`, else the
+  existing one. `sv_download_raw()` has a timeout, checks each response is
+  JSON before writing, and leaves the token and URL out of error messages.

@@ -140,6 +140,7 @@ ui <- bslib::page_sidebar(
       tags$ul(
         tags$li("This page runs R in your browser (WebAssembly). Files you choose are read here and are not uploaded."),
         tags$li("It makes no requests to other sites: no analytics, no proxy, no fonts or scripts from elsewhere."),
+        tags$li("A browser check on every build confirms this (the page's own policy tag does not cover the workers)."),
         tags$li("The only links that leave this page are the API links in step 2, and only if you click them."),
         tags$li("The vendor's server does not let a web page read those links directly, so you open each one, save the JSON, and drop the files here."),
         tags$li("A bundle holds your raw session data. Keep it private; closing this tab forgets everything."),

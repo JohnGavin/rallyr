@@ -280,7 +280,11 @@ test_that("bundle_to_tables() gives the tables the metrics read, from the sample
   expect_false(is.unsorted(tb$matches$played_at))
 })
 
-test_that("the tables from the sample bundle agree with the sample database", {
+# NOTE: this is a consistency check against the generator only. The sample
+# database is built by the same segmentation and derivation code that
+# bundle_derive_match() repeats, so agreement shows they have not drifted apart,
+# not that either is right. The duplication goes when PR #35 lands.
+test_that("the tables from the sample bundle are consistent with the generator's sample database (not independent)", {
   db <- system.file("extdata", "synthetic_sample.duckdb", package = "rallyr")
   skip_if(!nzchar(db))
   con <- DBI::dbConnect(duckdb::duckdb(), dbdir = db, read_only = TRUE)

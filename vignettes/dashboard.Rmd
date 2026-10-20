@@ -138,6 +138,12 @@ In the browser app you can do the same without R:
 - The app makes no requests to other sites: no analytics, no proxy, no
   fonts or scripts from elsewhere. A build check scans the code we ship and a
   browser check lists every request the loaded app makes.
+- The page carries a Content-Security-Policy `<meta>` tag, but that tag does
+  not bind the Shinylive frame or the workers, so it is a second line, not
+  the guarantee. The guarantee is the browser check: it loads the built site
+  in a real browser that can reach no other site, uses the app (an upload and
+  a merge), and fails on any request that leaves, workers and the service
+  worker included.
 - A bundle holds raw session data. Keep it private.
 
 ```{r info, echo = FALSE}
