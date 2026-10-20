@@ -7,7 +7,9 @@
 dq_flag_rallies(rallies, rally_speed_kmh)
 }
 \arguments{
-\item{rallies}{A tibble with (at least) \code{regime}, \code{n_shots}.}
+\item{rallies}{A tibble with (at least) \code{match_id}, \code{rally_id}, \code{regime},
+\code{me_shots} (see \code{\link[=rally_player_strokes]{rally_player_strokes()}}; the stroke limits count the
+"me" side's strokes only).}
 
 \item{rally_speed_kmh}{A tibble with (at least) \code{match_id}, \code{rally_id},
 \code{speed_kmh} (mean stroke speed for that rally) — see

@@ -25,3 +25,135 @@ test_that("an over-limit rally with no qualifying pause is flagged and left whol
 test_that("force_splits_until_under() no longer exists", {
   expect_false(exists("force_splits_until_under", envir = asNamespace("rallyr")))
 })
+
+# ---- per-drill limits and the pause rule ----------------------------------
+
+test_that("rally_stroke_threshold() returns each regime's own limit", {
+  p <- dq_params()
+  expect_equal(rally_stroke_threshold("forehand_cross_court", p), 20)
+  expect_equal(rally_stroke_threshold("backhand_cross_court", p), 20)
+  expect_equal(rally_stroke_threshold("mini_tennis", p), 50)
+  expect_equal(rally_stroke_threshold("net_volley", p), 25)
+  # An unlisted regime falls back to `default`; the lookup is vectorised.
+  expect_equal(rally_stroke_threshold(c("mixed", "mini_tennis", "gap"), p), c(25, 50, 25))
+})
+
+test_that("rally_split_gap_sec() is per regime and NA where no pause split applies", {
+  p <- dq_params()
+  expect_equal(rally_split_gap_sec("forehand_cross_court", p), 3)
+  expect_equal(rally_split_gap_sec("net_volley", p), 2)
+  expect_true(is.na(rally_split_gap_sec("mini_tennis", p)))
+  expect_equal(rally_split_gap_sec(c("net_volley", "mixed", "backhand_cross_court"), p), c(2, NA, 3))
+})
+
+test_that("dq_params() carries the neutral starter-rule parameter", {
+  p <- dq_params()
+  expect_true(p$split_requires_starter_next)
+  expect_null(p$split_requires_coach_next)
+  expect_setequal(p$pause_split_regimes, c("forehand_cross_court", "backhand_cross_court", "net_volley"))
+})
+
+test_that("find_rally_splits() only splits before a starter stroke when is_starter is given", {
+  t <- c(0, 1, 6, 7, 12)           # pauses of 1, 5, 1, 5 seconds
+  starter <- c(TRUE, FALSE, TRUE, FALSE, FALSE)
+  expect_equal(find_rally_splits(t, max_gap_sec = 3), c(2L, 4L))
+  # Boundary 4 is followed by a non-starter stroke: not a rally start.
+  expect_equal(find_rally_splits(t, max_gap_sec = 3, is_starter = starter), 2L)
+  expect_error(find_rally_splits(t, max_gap_sec = 3, is_starter = c(TRUE, FALSE)), "same length")
+})
+
+test_that("rally_pause_splits() uses a strict threshold and needs the starter next", {
+  # Strokes alternate host, guest, host, guest: the 5 s pause (gap 2) comes
+  # before the third stroke, which is the host's -- a rally start.
+  r <- mk_rally(c(1, 5, 1), players = c("host", "guest"), regime = "forehand_cross_court")
+  expect_equal(rally_pause_splits(r$shots, "forehand_cross_court"), 2L)
+
+  # The same long pause before a "me" (guest) stroke is a missed stroke.
+  r2 <- mk_rally(c(5, 1, 1), players = c("host", "guest"), regime = "forehand_cross_court")
+  expect_equal(rally_pause_splits(r2$shots, "forehand_cross_court"), integer(0))
+
+  # Strictly greater than: exactly 3 s does not split cross-court, 3.5 s does.
+  at <- mk_rally(c(1, 3, 1), regime = "forehand_cross_court")
+  over <- mk_rally(c(1, 3.5, 1), regime = "forehand_cross_court")
+  expect_equal(rally_pause_splits(at$shots, "forehand_cross_court"), integer(0))
+  expect_equal(rally_pause_splits(over$shots, "forehand_cross_court"), 2L)
+
+  # Net-volley uses 2 s.
+  nv <- mk_rally(c(1, 2.5, 1), regime = "net_volley")
+  expect_equal(rally_pause_splits(nv$shots, "net_volley"), 2L)
+
+  # Mini-tennis (and any unlisted regime) is never pause-split.
+  mt <- mk_rally(c(1, 30, 1), regime = "mini_tennis")
+  expect_equal(rally_pause_splits(mt$shots, "mini_tennis"), integer(0))
+
+  # The starter rule can be switched off: the pause alone decides.
+  p <- dq_params()
+  p$split_requires_starter_next <- FALSE
+  expect_equal(rally_pause_splits(r2$shots, "forehand_cross_court", p), 1L)
+})
+
+test_that("rally_player_strokes() counts only me_side's strokes", {
+  r <- mk_rally(rep(1, 9), players = c("host", "guest", "guest"))   # h g g h g g h g g h
+  out <- rally_player_strokes(r$rally, r$shots)
+  expect_equal(out$me_shots, 6L)
+  host <- rally_player_strokes(r$rally, r$shots, me_side = "host")
+  expect_equal(host$me_shots, 4L)
+  expect_error(rally_player_strokes(r$rally[, c("match_id", "rally_id")], r$shots), "needs")
+})
+
+test_that("dq_flag_rallies() applies each drill's limit to me_shots only", {
+  rally_for <- function(regime, me) {
+    tibble::tibble(match_id = 1L, rally_id = 1L, regime = regime, me_shots = me)
+  }
+  sp <- tibble::tibble(match_id = 1L, rally_id = 1L, speed_kmh = 30)
+  flag <- function(regime, me) dq_flag_rallies(rally_for(regime, me), sp)$flag_reason
+  # Cross-court: limit 20 (strictly over).
+  expect_true(is.na(flag("forehand_cross_court", 20)))
+  expect_match(flag("forehand_cross_court", 21), "strokes")
+  expect_match(flag("backhand_cross_court", 32), "strokes")
+  # Default regimes: 25. Mini-tennis: 50.
+  expect_true(is.na(flag("net_volley", 25)))
+  expect_match(flag("net_volley", 26), "strokes")
+  expect_true(is.na(flag("mini_tennis", 50)))
+  expect_match(flag("mini_tennis", 51), "strokes")
+  # The reason names no person.
+  expect_false(grepl("[A-Z][a-z]+ strokes", flag("net_volley", 26)))
+  expect_error(dq_flag_rallies(tibble::tibble(match_id = 1L, rally_id = 1L, regime = "net_volley"), sp), "me_shots")
+})
+
+test_that("a pause before a starter stroke splits a rally and each piece is checked against the limit", {
+  # A long pause before a host stroke splits an 82-stroke cross-court rally
+  # (limit 20 me-strokes): the over-limit piece is dropped, its sibling kept.
+  # (Strokes alternate host, guest, so the 43rd stroke, after the pause, is
+  # the host's.) Pieces: 42 strokes (21 me) and 40 strokes (20 me).
+  gaps <- c(rep(1, 41), 5, rep(1, 39))
+  r <- mk_rally(gaps, regime = "forehand_cross_court")        # 82 strokes
+  out <- dq_corrected_rallies(r$rally, r$shots)
+  expect_true(all(out$me_shots <= 20))
+  expect_equal(out$rally_id, "1_b")                           # the 21-stroke piece is left out
+
+  # A short rally pair separated by a qualifying pause: both kept, ids suffixed.
+  gaps2 <- c(rep(1, 11), 5, rep(1, 11))                        # 24 strokes: 12 + 12
+  r2 <- mk_rally(gaps2, regime = "forehand_cross_court")
+  out2 <- dq_corrected_rallies(r2$rally, r2$shots)
+  expect_equal(nrow(out2), 2L)
+  expect_equal(out2$rally_id, c("1_a", "1_b"))
+  expect_equal(sum(out2$n_shots), 24L)
+  expect_true(all(out2$me_shots <= 20))
+})
+
+test_that("no row of dq_corrected_rallies() exceeds its limit; me_side mirrors", {
+  a <- mk_rally(c(rep(1, 11), 5, rep(1, 11)), regime = "net_volley", rally_id = 1L)
+  b <- mk_rally(rep(1, 70), regime = "net_volley", rally_id = 2L)
+  r <- bind_rallies(a, b)
+  out <- dq_corrected_rallies(r$rally, r$shots)
+  expect_true(all(out$me_shots <= rally_stroke_threshold(out$regime)))
+  expect_false(2L %in% as.integer(sub("_.*", "", out$rally_id)))   # whole over-limit rally left out
+
+  # Swapping the labels and asking for me_side = "host" gives the same rallies.
+  swapped <- r$shots
+  swapped$player <- ifelse(swapped$player == "guest", "host", "guest")
+  mirrored <- dq_corrected_rallies(r$rally, swapped, me_side = "host", rally_starter = "guest")
+  expect_equal(mirrored$rally_id, out$rally_id)
+  expect_equal(mirrored$me_shots, out$me_shots)
+})

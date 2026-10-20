@@ -2,42 +2,51 @@
 % Please edit documentation in R/data_quality_params.R
 \name{split_flagged_rallies}
 \alias{split_flagged_rallies}
-\title{Propose splits for rallies flagged for an excess stroke count}
+\title{Propose the pause-rule split of every rally, for human review}
 \usage{
-split_flagged_rallies(rallies_flagged, shot_detail, params = dq_params())
+split_flagged_rallies(
+  rallies_flagged,
+  shot_detail,
+  params = dq_params(),
+  me_side = "guest",
+  rally_starter = "host"
+)
 }
 \arguments{
 \item{rallies_flagged}{Output of \code{\link[=dq_flag_rallies]{dq_flag_rallies()}} -- must include
-\code{match_id}, \code{rally_id}, \code{regime}, \code{n_shots}, \code{flag_reason}.}
+\code{match_id}, \code{rally_id}, \code{regime}, \code{flag_reason}.}
 
 \item{shot_detail}{A tibble with (at least) \code{match_id}, \code{rally_id},
-\code{started_at} -- see \code{tennis_shot_detail()} in \code{R/db.R}.}
+\code{player}, \code{started_at} -- see \code{tennis_shot_detail()} in \code{R/db.R}.}
 
 \item{params}{A \code{dq_params()}-shaped list; pass a custom one to explore a
 different threshold.}
+
+\item{me_side}{Which \code{player} value counts as "me" (\code{"guest"}).}
+
+\item{rally_starter}{Which \code{player} value starts rallies (\code{"host"}).}
 }
 \value{
-A tibble, one row per proposed sub-rally: \code{match_id} (rally IDs
-are only unique WITHIN a match), \code{orig_rally_id}, \code{orig_n_shots},
-\code{new_rally_id}, \code{new_n_shots}, \code{split} (logical -- was this rally
-actually split), \code{split_method} (\code{"none"} / \code{"gap_threshold"}),
+A tibble, one row per sub-rally: \code{match_id} (rally IDs are only
+unique WITHIN a match), \code{orig_rally_id}, \code{orig_n_shots}, \code{new_rally_id},
+\code{new_n_shots} (the "me" side's strokes, as for every limit), \code{split}
+(logical), \code{split_method} (\code{"none"} / \code{"gap_threshold"}),
 \code{still_flagged} (logical -- does the sub-rally still exceed its own
 regime's stroke threshold).
 }
 \description{
-For every rally in \code{rallies_flagged} currently flagged for exceeding its
-stroke-count threshold (not the speed threshold -- a fast rally isn't a
-grouping-boundary problem), looks up its shots in \code{shot_detail} and
-proposes a split at every pause \code{\link[=find_rally_splits]{find_rally_splits()}} finds against
-\code{params$max_stroke_gap_sec}.
+Runs the pause rule (\code{\link[=rally_pause_splits]{rally_pause_splits()}}) on EVERY rally of a
+pause-split regime -- not only the ones over their stroke limit -- because
+the vendor's own grouping (\code{pid}) can merge real rallies well under the
+limit. Other regimes are never split; rallies flagged only for speed are
+skipped (dropped, not a grouping problem).
 }
 \details{
-\strong{The stroke limit only flags; it never splits.} A rally with no
-qualifying pause is reported unsplit and still flagged -- there is no
-forced split at its largest gap. A rally with no internal gap at all (a
-single stroke) passes through unsplit, not silently dropped.
+Output covers every rally the rule splits (one row per sub-rally), plus
+every rally still over its stroke limit that has NO qualifying pause (one
+unsplit row, \code{still_flagged} \code{TRUE}). \strong{The stroke limit only flags:
+nothing is force-split.} Unsplit rallies within their limit are omitted.
 
-This is a \strong{proposed} correction for human review -- it does NOT write
-anything back to the database.
+A \strong{proposal} for human review: nothing is written back to the database.
 }
 \keyword{internal}

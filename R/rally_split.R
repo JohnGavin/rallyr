@@ -31,13 +31,20 @@
 #'   than this is treated as a likely rally boundary. Not derived by this
 #'   function — pass the project's calibrated threshold (see
 #'   issue #5).
+#' @param is_starter Optional logical vector, same length as `started_at`:
+#'   `TRUE` where the stroke belongs to the rally starter (the feeder). When
+#'   supplied, a gap only counts as a boundary if the stroke AFTER it is the
+#'   starter's (the starter begins every rally, so a long pause before the
+#'   other player's stroke is a missed stroke, not a new rally). `NULL`
+#'   (default): the pause alone decides.
 #' @return Integer vector of split-point indices `i`, each satisfying
 #'   `1 <= i < length(started_at)`, meaning "a split occurs between stroke
 #'   `i` and stroke `i + 1`". A rally with `k` qualifying gaps splits into
 #'   `k + 1` sub-rallies. Empty (`integer(0)`) when no gap exceeds the
-#'   threshold, or when fewer than 2 strokes are supplied.
+#'   threshold (or none is followed by a starter stroke, when `is_starter`
+#'   is supplied), or when fewer than 2 strokes are supplied.
 #' @export
-find_rally_splits <- function(started_at, ended_at = NULL, max_gap_sec) {
+find_rally_splits <- function(started_at, ended_at = NULL, max_gap_sec, is_starter = NULL) {
   n <- length(started_at)
   if (n < 2L) {
     return(integer(0))
@@ -49,9 +56,20 @@ find_rally_splits <- function(started_at, ended_at = NULL, max_gap_sec) {
     ))
   }
 
+  if (!is.null(is_starter) && length(is_starter) != n) {
+    cli::cli_abort(c(
+      "x" = "{.arg is_starter} must be the same length as {.arg started_at}.",
+      "i" = "Got {length(is_starter)} and {n}."
+    ))
+  }
+
   gap_end   <- if (is.null(ended_at)) started_at[-n] else ended_at[-n]
   gap_start <- started_at[-1]
   gaps_sec  <- as.numeric(gap_start) - as.numeric(gap_end)
 
-  which(gaps_sec > max_gap_sec)
+  is_boundary <- gaps_sec > max_gap_sec
+  if (!is.null(is_starter)) {
+    is_boundary <- is_boundary & (is_starter[-1] %in% TRUE)
+  }
+  which(is_boundary)
 }
