@@ -34,4 +34,15 @@ value forms one contiguous run of shots -- SwingVision already segments
 the match into points/rallies itself, so this does not need a time-gap
 heuristic. \code{rally_id} is unique only \emph{within} a \code{match_id}, not globally
 -- pair with \code{match_id} to identify a rally.
+
+Beyond the core columns, the shot table keeps the fields later checks
+need, so they never require a live re-fetch (rallyr#20): \code{hit_frame} (the
+video frame number of the stroke), \code{hit_court_side}/\code{bounce_court_side},
+\code{net_clearance_m} (see \code{\link[=sv_net_clearance_m]{sv_net_clearance_m()}}), the categorical
+\code{bounce_location_long}/\code{bounce_location_lat}, numeric hit and bounce
+coordinates (\code{hit_x}/\code{hit_y}/\code{hit_z}, \code{bounce_x}/\code{bounce_y}/\code{bounce_z},
+as supplied by the API; units are not verified) and the three raw
+\verb{hit_velocity_*} components (m/s, as supplied) that \code{shot_speed_mph} is
+the magnitude of. A field absent from a shot is \code{NA}. Other raw fields are
+deliberately not persisted.
 }

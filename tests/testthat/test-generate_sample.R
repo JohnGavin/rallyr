@@ -103,3 +103,25 @@ test_that("write_synthetic_sample_db() writes a database matching tennis_db_sche
   back <- tennis_matches(con)
   expect_equal(nrow(back), 1L)
 })
+
+test_that("synthetic shots carry the persisted precision fields (#20)", {
+  env <- source_synthetic_script()
+  data <- env$generate_synthetic_sample(n_sessions = 1, seed = 7)
+  sd <- data$shot_detail
+  cols <- c(
+    "hit_frame", "hit_court_side", "bounce_court_side", "net_clearance_m",
+    "bounce_location_long", "bounce_location_lat", "hit_x", "hit_y", "hit_z",
+    "bounce_x", "bounce_y", "bounce_z",
+    "hit_velocity_x", "hit_velocity_y", "hit_velocity_z"
+  )
+  expect_true(all(cols %in% names(sd)))
+  expect_false(anyNA(sd[cols]))
+  # frames increase with time within a match
+  sd <- sd[order(sd$started_at), ]
+  expect_false(is.unsorted(sd$hit_frame))
+  # the speed is the magnitude of the velocity components
+  mag_mph <- sqrt(sd$hit_velocity_x^2 + sd$hit_velocity_y^2 + sd$hit_velocity_z^2) * 2.2369362920544
+  expect_equal(mag_mph, sd$shot_speed_mph, tolerance = 0.01)
+  # timestamps keep a fractional second
+  expect_true(any(as.numeric(sd$started_at) %% 1 > 0))
+})

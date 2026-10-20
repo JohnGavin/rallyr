@@ -17,7 +17,11 @@ if the table doesn't exist yet.
 Per-shot rows tagged with their drill-phase segment and rally, as written
 by \code{scripts/update_segments.R}: one row per shot per match, with
 \code{segment_index}/\code{regime} joined on from that match's \code{shot_segments} rows,
-and \code{rally_id} from the shot's own \code{pid} field (see \code{\link[=sv_parse_shots]{sv_parse_shots()}}).
+and \code{rally_id} from the shot's own \code{pid} field (see \code{\link[=sv_parse_shots]{sv_parse_shots()}},
+which lists the persisted precision fields: frame number, court sides,
+net clearance, bounce zones, numeric coordinates and velocity
+components). A database written before those columns existed returns them
+as \code{NA} after the next upsert adds them (see \code{\link[=tennis_db_upsert]{tennis_db_upsert()}}).
 This is the pooled, shot-level source for distribution/percentile views
 (e.g. shot-speed spread within each regime) — \code{\link[=tennis_segments]{tennis_segments()}} only
 has per-segment summary statistics, not the underlying shots.

@@ -147,6 +147,17 @@ fetch_swingvision_shots <- function(url_or_token) {
 #' heuristic. `rally_id` is unique only *within* a `match_id`, not globally
 #' -- pair with `match_id` to identify a rally.
 #'
+#' Beyond the core columns, the shot table keeps the fields later checks
+#' need, so they never require a live re-fetch (rallyr#20): `hit_frame` (the
+#' video frame number of the stroke), `hit_court_side`/`bounce_court_side`,
+#' `net_clearance_m` (see [sv_net_clearance_m()]), the categorical
+#' `bounce_location_long`/`bounce_location_lat`, numeric hit and bounce
+#' coordinates (`hit_x`/`hit_y`/`hit_z`, `bounce_x`/`bounce_y`/`bounce_z`,
+#' as supplied by the API; units are not verified) and the three raw
+#' `hit_velocity_*` components (m/s, as supplied) that `shot_speed_mph` is
+#' the magnitude of. A field absent from a shot is `NA`. Other raw fields are
+#' deliberately not persisted.
+#'
 #' @param shots The `data` element of `/v1/matches/{token}/shots` -- a list
 #'   of shot objects.
 #' @return A tibble, one row per shot, sorted by `started_at` ascending.
@@ -164,7 +175,16 @@ sv_parse_shots <- function(shots) {
       hit_type        = character(0),
       spin_type       = character(0),
       shot_speed_mph  = numeric(0),
-      shot_in         = logical(0)
+      shot_in         = logical(0),
+      hit_frame            = numeric(0),
+      hit_court_side       = character(0),
+      bounce_court_side    = character(0),
+      net_clearance_m      = numeric(0),
+      bounce_location_long = character(0),
+      bounce_location_lat  = character(0),
+      hit_x = numeric(0), hit_y = numeric(0), hit_z = numeric(0),
+      bounce_x = numeric(0), bounce_y = numeric(0), bounce_z = numeric(0),
+      hit_velocity_x = numeric(0), hit_velocity_y = numeric(0), hit_velocity_z = numeric(0)
     ))
   }
 
@@ -180,7 +200,22 @@ sv_parse_shots <- function(shots) {
       hit_type       = sv_chr(sh$hit_type),
       spin_type      = sv_chr(sh$spin_type),
       shot_speed_mph = sv_speed_mph(sh$hit_velocity),
-      shot_in        = sv_shot_in(sh$net_type, sh$bounce_location_long, sh$bounce_location_lat)
+      shot_in        = sv_shot_in(sh$net_type, sh$bounce_location_long, sh$bounce_location_lat),
+      hit_frame            = sv_num(sh$hit_frame),
+      hit_court_side       = sv_chr(sh$hit_court_side),
+      bounce_court_side    = sv_chr(sh$bounce_court_side),
+      net_clearance_m      = sv_net_clearance_m(sh$net_location),
+      bounce_location_long = sv_chr(sh$bounce_location_long),
+      bounce_location_lat  = sv_chr(sh$bounce_location_lat),
+      hit_x    = sv_component(sh$hit_location, 1L),
+      hit_y    = sv_component(sh$hit_location, 2L),
+      hit_z    = sv_component(sh$hit_location, 3L),
+      bounce_x = sv_component(sh$bounce_location, 1L),
+      bounce_y = sv_component(sh$bounce_location, 2L),
+      bounce_z = sv_component(sh$bounce_location, 3L),
+      hit_velocity_x = sv_component(sh$hit_velocity, 1L),
+      hit_velocity_y = sv_component(sh$hit_velocity, 2L),
+      hit_velocity_z = sv_component(sh$hit_velocity, 3L)
     )
   })
 
@@ -223,6 +258,26 @@ sv_shot_in <- function(net_type, bounce_location_long, bounce_location_lat) {
 sv_time <- function(x) {
   if (is.null(x)) return(as.POSIXct(NA))
   as.POSIXct(x, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
+}
+#' Net-clearance height, in metres, from a shot's `net_location`
+#'
+#' The third element of `net_location` is the ball's height as it crosses the
+#' net plane. The value is raw and not cleaned: no plausibility threshold is
+#' applied here.
+#'
+#' @param net_location Raw `net_location` field (a list/vector, or `NULL`).
+#' @return A length-1 numeric (metres), or `NA_real_` if unavailable.
+#' @keywords internal
+sv_net_clearance_m <- function(net_location) sv_component(net_location, 3L)
+
+#' The `i`-th element of a raw numeric vector field, or `NA`
+#' @param v A list/vector field from one shot object, or `NULL`.
+#' @param i Element index.
+#' @return A length-1 numeric.
+#' @keywords internal
+sv_component <- function(v, i) {
+  if (is.null(v) || length(v) < i || is.null(v[[i]])) return(NA_real_)
+  sv_num(v[[i]])
 }
 #' @keywords internal
 sv_num <- function(x) if (is.null(x)) NA_real_ else as.numeric(x)

@@ -132,7 +132,11 @@ tennis_segments <- function(con) {
 #' Per-shot rows tagged with their drill-phase segment and rally, as written
 #' by `scripts/update_segments.R`: one row per shot per match, with
 #' `segment_index`/`regime` joined on from that match's `shot_segments` rows,
-#' and `rally_id` from the shot's own `pid` field (see [sv_parse_shots()]).
+#' and `rally_id` from the shot's own `pid` field (see [sv_parse_shots()],
+#' which lists the persisted precision fields: frame number, court sides,
+#' net clearance, bounce zones, numeric coordinates and velocity
+#' components). A database written before those columns existed returns them
+#' as `NA` after the next upsert adds them (see [tennis_db_upsert()]).
 #' This is the pooled, shot-level source for distribution/percentile views
 #' (e.g. shot-speed spread within each regime) — [tennis_segments()] only
 #' has per-segment summary statistics, not the underlying shots.
@@ -154,6 +158,15 @@ tennis_shot_detail <- function(con) {
       spin_type      = character(0),
       shot_speed_mph = numeric(0),
       shot_in        = logical(0),
+      hit_frame            = numeric(0),
+      hit_court_side       = character(0),
+      bounce_court_side    = character(0),
+      net_clearance_m      = numeric(0),
+      bounce_location_long = character(0),
+      bounce_location_lat  = character(0),
+      hit_x = numeric(0), hit_y = numeric(0), hit_z = numeric(0),
+      bounce_x = numeric(0), bounce_y = numeric(0), bounce_z = numeric(0),
+      hit_velocity_x = numeric(0), hit_velocity_y = numeric(0), hit_velocity_z = numeric(0),
       segment_index  = integer(0),
       regime         = character(0),
       regime_occurrence = numeric(0)

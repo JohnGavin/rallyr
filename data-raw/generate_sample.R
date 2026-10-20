@@ -107,6 +107,28 @@ if (identical(Sys.getenv("SYNTHETIC_SAMPLE_SKIP_LOAD"), "")) {
         shots_since_rally <- 0L
       }
 
+      # Precision fields (rallyr#20). All hand-picked random ranges, not fitted.
+      # They are drawn from their own per-shot seed so the main RNG stream
+      # (and with it every pre-existing column) is unchanged by their addition.
+      # hit_frame is time since session start at a nominal 60 fps; the
+      # velocity components are a random unit direction scaled to `speed`.
+      extra <- withr::with_seed((match_id %% 100000L) * 1000L + shot_id_ctr, {
+        dir <- stats::runif(3, -1, 1)
+        dir <- dir / sqrt(sum(dir^2))
+        list(
+          v_ms = dir * speed / 2.2369362920544,
+          net_clearance_m = round(stats::runif(1, 0.8, 1.8), 2),
+          long = sample(c("service_box", "no_mans_land", "baseline", "out"), 1L,
+                        prob = c(0.3, 0.3, 0.3, 0.1)),
+          lat = sample(c("deuce", "ad"), 1L),
+          hit = c(round(stats::runif(1, -4, 4), 2), round(stats::runif(1, -12, 12), 2),
+                  round(stats::runif(1, 0.2, 2.5), 2)),
+          bounce = c(round(stats::runif(1, -4, 4), 2), round(stats::runif(1, -12, 12), 2))
+        )
+      })
+      near_side <- if (player == "guest") "near" else "far"
+      far_side  <- if (player == "guest") "far" else "near"
+
       phase_rows[[j]] <- tibble::tibble(
         match_id       = match_id,
         shot_id        = shot_id_ctr,
@@ -118,7 +140,22 @@ if (identical(Sys.getenv("SYNTHETIC_SAMPLE_SKIP_LOAD"), "")) {
         hit_type       = hit_type,
         spin_type      = spin_type,
         shot_speed_mph = round(speed, 1),
-        shot_in        = stats::runif(1) < 0.80
+        shot_in        = stats::runif(1) < 0.80,
+        hit_frame            = round(as.numeric(difftime(started_at, session_start, units = "secs")) * 60),
+        hit_court_side       = near_side,
+        bounce_court_side    = far_side,
+        net_clearance_m      = extra$net_clearance_m,
+        bounce_location_long = extra$long,
+        bounce_location_lat  = extra$lat,
+        hit_x    = extra$hit[1],
+        hit_y    = extra$hit[2],
+        hit_z    = extra$hit[3],
+        bounce_x = extra$bounce[1],
+        bounce_y = extra$bounce[2],
+        bounce_z = 0,
+        hit_velocity_x = extra$v_ms[1],
+        hit_velocity_y = extra$v_ms[2],
+        hit_velocity_z = extra$v_ms[3]
       )
     }
     rows[[i]] <- dplyr::bind_rows(phase_rows)
@@ -173,7 +210,12 @@ if (identical(Sys.getenv("SYNTHETIC_SAMPLE_SKIP_LOAD"), "")) {
 
   shot_rows <- shots[, c(
     "match_id", "shot_id", "rally_id", "player", "started_at", "hit_type", "hit_wing", "spin_type",
-    "shot_speed_mph", "shot_in", "segment_index", "regime", "regime_occurrence"
+    "shot_speed_mph", "shot_in",
+    "hit_frame", "hit_court_side", "bounce_court_side", "net_clearance_m",
+    "bounce_location_long", "bounce_location_lat",
+    "hit_x", "hit_y", "hit_z", "bounce_x", "bounce_y", "bounce_z",
+    "hit_velocity_x", "hit_velocity_y", "hit_velocity_z",
+    "segment_index", "regime", "regime_occurrence"
   )]
 
   mode_num <- function(x) as.numeric(names(sort(table(x), decreasing = TRUE))[1])
