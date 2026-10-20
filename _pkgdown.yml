@@ -1,0 +1,19 @@
+url: https://johngavin.github.io/rallyr/
+destination: _site
+
+template:
+  bootstrap: 5
+  light-switch: true
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news, app]
+    right: [search, github, lightswitch]
+  components:
+    app:
+      text: Browser app
+      href: app/
+
+articles:
+  - title: Guides
+    contents: dashboard

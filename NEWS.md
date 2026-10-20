@@ -1,4 +1,6 @@
-# rallyr 0.0.0.9000
+# rallyr 0.1.0
+
+First public release (version bumped for the first deployed site).
 
 ## Breaking changes
 
@@ -63,3 +65,23 @@
   `rallyr_net_clearance()`, `rallyr_stroke_quality()`, `rallyr_api_schema()`
   and `rallyr_schema_version()`: a documented interface for derived data with
   a stability policy (`?"rallyr-api"`).
+
+## Public site, bundles and a browser app
+
+* A pkgdown site and a vignette ("Charts from the synthetic sample") built on
+  the synthetic sample; a GitHub Actions workflow builds the site and deploys
+  it to Pages from `main`.
+* An app at `/app/` (Shinylive: R running in the browser) to load a bundle of
+  past sessions, add the latest session from the three saved API payloads,
+  merge by `match_id` with a report, download the updated bundle and see the
+  charts. Files stay in the browser; the build checks that the shipped code
+  makes no request to another site.
+* Bundles: `bundle_new()`, `bundle_read()`, `bundle_write()`,
+  `bundle_payload_kind()`, `bundle_add_raw()`, `bundle_merge()`,
+  `bundle_players()`, `bundle_to_tables()`, `bundle_derived()` and
+  `bundle_schema_version()` (file format version 1). They need no database.
+* `sv_download_raw()` saves the three raw payloads of a shared session.
+* Charts: `plot_session_trend()`, `plot_rally_length()`,
+  `plot_stroke_speed()`, `plot_net_clearance()` and `plot_gap_distribution()`
+  (ggplot2, suggested).
+* New dependency: jsonlite. Suggested: ggplot2, shiny, bslib, knitr, rmarkdown.

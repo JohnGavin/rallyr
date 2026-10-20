@@ -1,0 +1,94 @@
+# Build the public site (pkgdown pages plus the in-browser app) and, on a push
+# to main, deploy it to GitHub Pages.
+#
+# The site: pkgdown (README, reference, the vignette) at the root, and the
+# Shinylive app (R running in the browser, no server) at /app/.
+#
+# Privacy checks run on every build, before anything is uploaded:
+#  1. tools/check_site_privacy.R scans the code we ship for requests to other
+#     sites and checks the app pages carry the Content-Security-Policy;
+#  2. tools/check_app_requests.mjs loads the built site in a real browser and
+#     fails if any request (workers included) goes to another origin, or if the
+#     app does not draw a chart (then the result is indeterminate, not a pass).
+#
+# This workflow does not enable Pages. The repository owner does that once:
+# Settings > Pages > Source: GitHub Actions. Until then the deploy job fails
+# on a push to main; the build job still validates every pull request.
+
+name: pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          needs: website
+          extra-packages: |
+            any::pkgdown
+            any::shinylive
+            any::testthat
+            any::pkgload
+            any::withr
+            local::.
+
+      - name: Tests of the app and of the privacy check
+        run: Rscript -e 'testthat::test_local(filter = "app|site_privacy|bundle|plots", reporter = "summary", stop_on_failure = TRUE)'
+
+      - name: Build the pkgdown site
+        run: Rscript -e 'pkgdown::build_site(new_process = FALSE)'
+
+      - name: Build and export the browser app into the site
+        run: Rscript tools/build_app.R _site
+
+      - name: Privacy check of the code we ship (static)
+        run: Rscript tools/check_site_privacy.R _site --csp-dir=app
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Privacy check of every request (real browser)
+        run: |
+          npm install --no-save --no-package-lock playwright@1.49.1
+          npx playwright install --with-deps chromium
+          node tools/check_app_requests.mjs _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

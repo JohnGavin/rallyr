@@ -1,0 +1,10 @@
+^\.github$
+^\.claude$
+^_pkgdown\.yml$
+^_site$
+^_app_build$
+^docs$
+^tools$
+^data-raw$
+^\.gitignore$
+^LICENSE\.md$
