@@ -209,10 +209,20 @@ sv_shot_in <- function(net_type, bounce_location_long, bounce_location_lat) {
 
 # ---- small coercers --------------------------------------------------------
 
+#' Parse a SwingVision ISO-8601 timestamp, keeping sub-second precision
+#'
+#' The API returns millisecond timestamps such as `"...T10:00:00.742000Z"`.
+#' The fraction is kept (`%OS`): per-shot gaps drive rally-boundary
+#' detection, so rounding every stroke to the whole second throws away the
+#' signal being measured (rallyr#14). The fraction lives in the underlying
+#' double; set `options(digits.secs = 3)` only to *print* it.
+#'
+#' @param x A timestamp string (or character vector), or `NULL`.
+#' @return A `POSIXct` in UTC; `NA` for `NULL`.
 #' @keywords internal
 sv_time <- function(x) {
   if (is.null(x)) return(as.POSIXct(NA))
-  as.POSIXct(sub("\\.\\d+Z$", "Z", x), format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  as.POSIXct(x, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
 }
 #' @keywords internal
 sv_num <- function(x) if (is.null(x)) NA_real_ else as.numeric(x)
