@@ -15,6 +15,18 @@ test_that("example_drill_order is a documented character constant", {
   expect_gte(length(example_drill_order), 2L)
 })
 
+test_that("every example_drill_order value is a regime the package knows", {
+  skip("pending owner decision: warm-up regime name")
+  p <- dq_params()
+  known <- unique(c(
+    setdiff(names(p$max_rally_strokes), "default"),
+    p$pause_split_regimes,
+    # regimes segment_session_shots() can emit
+    "net_volley", "mini_tennis", "mixed", "gap"
+  ))
+  expect_true(all(example_drill_order %in% known))
+})
+
 test_that("drill_order is required and validated", {
   s <- mk_session(c(20, 20), 90)
   expect_error(segment_session_drills(s), "drill_order")
@@ -69,7 +81,7 @@ test_that("an isolated stray stroke between two pauses is merged away", {
 
 test_that("input order does not matter and short input is typed-empty", {
   s <- mk_session(c(20, 20), 90)
-  shuffled <- s[sample(nrow(s)), ]
+  shuffled <- withr::with_seed(1L, s[sample(nrow(s)), ])
   expect_equal(segment_session_drills(shuffled, drill_order = c("a", "b"))$n_shots,
                c(20L, 20L))
   out <- segment_session_drills(s[1, ], drill_order = c("a", "b"))
