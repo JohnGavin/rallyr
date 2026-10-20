@@ -54,3 +54,55 @@ test_that("a failed download writes nothing", {
   expect_error(sv_download_raw("sw2-EXAMPLE01", dir), "said no")
   expect_false(dir.exists(dir))
 })
+
+test_that("a failure on the 2nd of 3 requests writes nothing and hides the token and URL", {
+  s <- sample_session(1L)
+  bodies <- mock_bodies(s)
+  n <- 0L
+  local_mocked_bindings(
+    sv_get_raw = function(url) {
+      n <<- n + 1L
+      if (n == 2L) cli::cli_abort(paste0("Could not connect to ", url, "?key=abc"))
+      bodies$match
+    }
+  )
+  dir <- file.path(withr::local_tempdir(), "never")
+  err <- tryCatch(sv_download_raw("sw2-EXAMPLE01", dir), error = function(e) e)
+  expect_s3_class(err, "error")
+  expect_identical(n, 2L)
+  expect_false(dir.exists(dir))
+  msg <- paste(conditionMessage(err), collapse = " ")
+  expect_false(grepl("sw2-EXAMPLE01", msg, fixed = TRUE))
+  expect_false(grepl("https?://", msg))
+  expect_match(msg, "stats")
+})
+
+test_that("a response that is not JSON is refused before anything is written", {
+  s <- sample_session(1L)
+  bodies <- mock_bodies(s)
+  local_mocked_bindings(
+    sv_get_raw = function(url) {
+      if (grepl("/shots$", url)) "<html>please sign in</html>" else bodies$match
+    }
+  )
+  dir <- file.path(withr::local_tempdir(), "never")
+  err <- tryCatch(sv_download_raw("sw2-EXAMPLE01", dir), error = function(e) e)
+  expect_s3_class(err, "error")
+  expect_false(dir.exists(dir))
+  msg <- paste(conditionMessage(err), collapse = " ")
+  expect_match(msg, "not JSON")
+  expect_match(msg, "shots")
+  expect_false(grepl("sign in", msg, fixed = TRUE))
+  expect_false(grepl("sw2-EXAMPLE01", msg, fixed = TRUE))
+})
+
+test_that("each request has a timeout", {
+  seen <- NULL
+  httr2::local_mocked_responses(function(req) {
+    seen <<- c(seen, req$options$timeout_ms)
+    httr2::response(status_code = 200, body = charToRaw("{}"))
+  })
+  expect_identical(sv_get_raw("https://example.invalid/x"), "{}")
+  expect_gt(length(seen), 0L)
+  expect_true(all(seen > 0 & seen <= 120000))
+})

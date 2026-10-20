@@ -42,7 +42,25 @@ sv_download_raw <- function(url_or_token, dir) {
     stats = sprintf("%s/matches/%s/stats", base, token),
     shots = sprintf("%s/matches/%s/shots", base, token)
   )
-  bodies <- lapply(urls, sv_get_raw)
+  # All three are fetched and checked before anything is written. Messages
+  # name the payload (match, stats, shots), never the token or the URL.
+  bodies <- lapply(names(urls), function(k) {
+    body <- tryCatch(
+      sv_get_raw(urls[[k]]),
+      error = function(e) {
+        detail <- sv_redact(conditionMessage(e), c(urls[[k]], token, base))
+        cli::cli_abort(c("x" = "Could not fetch the {k} payload.", "i" = "{detail}"), call = NULL)
+      }
+    )
+    if (!is.character(body) || length(body) != 1L || !isTRUE(jsonlite::validate(body))) {
+      cli::cli_abort(c(
+        "x" = "The {k} response is not JSON, so nothing was saved.",
+        "i" = "The link may have expired, or the share may be private."
+      ), call = NULL)
+    }
+    body
+  })
+  names(bodies) <- names(urls)
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
   paths <- file.path(dir, sprintf("%s_%s.json", token, names(urls)))
   names(paths) <- names(urls)
@@ -52,10 +70,18 @@ sv_download_raw <- function(url_or_token, dir) {
   invisible(paths)
 }
 
+# `text` with every string in `secrets` (and any URL) replaced by "<redacted>".
+sv_redact <- function(text, secrets) {
+  text <- paste(text, collapse = " ")
+  for (z in secrets[nzchar(secrets)]) text <- gsub(z, "<redacted>", text, fixed = TRUE)
+  gsub("https?://[^[:space:]\"')>]+", "<redacted>", text)
+}
+
 # The body of a GET, as text, with no parsing.
 sv_get_raw <- function(url) {
   resp <- httr2::request(url) |>
     httr2::req_user_agent("rallyr (https://github.com/JohnGavin/rallyr)") |>
+    httr2::req_timeout(30) |>
     httr2::req_retry(max_tries = 3) |>
     httr2::req_perform()
   httr2::resp_body_string(resp)
