@@ -1,16 +1,20 @@
 Package: rallyr
 Title: Parse and Analyse SwingVision Tennis Session Exports
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R:
     person("Package", "Maintainer", , "maintainer@example.com", role = c("aut", "cre"))
 Description: Parse tennis practice-session exports from the SwingVision app
     (either its public share API or a raw copy-pasted match page) into a
     tidy, one-row-per-match table, persist them to a local DuckDB database,
-    and compute derived per-rally and per-session metrics. Ships with a
-    synthetic sample dataset so the bundled example workflow can be run
-    without any real session data. This package is MIT-licensed and is not
-    affiliated with, nor endorsed by, SwingVision, in any way.
+    and compute derived per-rally and per-session metrics. Sessions can be
+    kept as a portable "bundle" file of the raw payloads, which the package's
+    browser app reads, merges and writes without sending any data anywhere.
+    Ships with a synthetic sample dataset so the bundled example workflow can
+    be run without any real session data. This package is MIT-licensed and is
+    not affiliated with, nor endorsed by, SwingVision, in any way.
 License: MIT + file LICENSE
+URL: https://github.com/JohnGavin/rallyr, https://johngavin.github.io/rallyr/
+BugReports: https://github.com/JohnGavin/rallyr/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
@@ -20,10 +24,17 @@ Imports:
     dplyr,
     duckdb,
     httr2,
+    jsonlite,
     rlang,
     tibble
 Suggests:
+    bslib,
+    ggplot2,
+    knitr,
     pkgload,
+    rmarkdown,
+    shiny,
     testthat (>= 3.0.0),
     withr
+VignetteBuilder: knitr
 Config/testthat/edition: 3
