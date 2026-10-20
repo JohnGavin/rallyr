@@ -107,3 +107,23 @@ test_that("the schema spec is frozen per schema version (#8)", {
     label = paste("schema fingerprint at version", v, "(spec changed: bump the version)")
   )
 })
+
+test_that("rallyr_stroke_quality() values are in range on the synthetic DB (#8)", {
+  sq <- rallyr_stroke_quality(con)
+  expect_false(is.unsorted(sq$session_date))
+  expect_false(anyDuplicated(sq$session_date) > 0)
+  expect_true(all(sq$n_strokes >= 1L))
+  expect_true(all(sq$speed_mph[!is.na(sq$speed_mph)] > 0))
+  expect_true(all(sq$zone_score[!is.na(sq$zone_score)] >= 0 & sq$zone_score[!is.na(sq$zone_score)] <= 1))
+  expect_false(any(is.nan(c(sq$z_speed, sq$z_zone, sq$z_clearance, sq$quality))))
+  expect_true(all(is.finite(sq$quality[!is.na(sq$quality)])))
+})
+
+test_that("rallyr_net_clearance() counts are non-negative and keys unique (#8)", {
+  nc <- rallyr_net_clearance(con)
+  expect_true(all(nc$me_n >= 0L & nc$opp_n >= 0L & nc$n_implausible >= 0L, na.rm = TRUE))
+  expect_false(anyNA(nc[, c("me_n", "opp_n", "n_implausible")]))
+  expect_false(anyDuplicated(nc[, c("match_id", "regime")]) > 0)
+  has_both <- !is.na(nc$me_median_m) & !is.na(nc$opp_median_m)
+  expect_equal(nc$diff_m[has_both], nc$me_median_m[has_both] - nc$opp_median_m[has_both])
+})
