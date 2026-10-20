@@ -76,6 +76,12 @@
 #' values that cannot be a height at all. Recalibrate them from the observed
 #' distribution, not to hide values.
 #'
+#' `stroke_quality_weights` are the weights of the stroke-quality composite
+#' ([stroke_quality_session()]): `speed` 1, `zone` 1, `clearance` 0. Clearance
+#' is reported but not scored by default because more is not simply better (a
+#' very high ball is a lob, a very low one a net risk) and the height
+#' reference is unstated; give it a weight only once that is settled.
+#'
 #' @return A named list: `max_mean_stroke_speed_kmh` (numeric),
 #'   `max_individual_stroke_speed_kmh` (numeric),
 #'   `min_segment_duration_min` (numeric),
@@ -88,7 +94,8 @@
 #'   regimes the pause rule splits), and `split_requires_starter_next`
 #'   (logical -- a pause only splits a rally when the stroke after it is the
 #'   rally starter's), and `min_net_clearance_m` / `max_net_clearance_m`
-#'   (numeric -- the plausible net-clearance range in metres).
+#'   (numeric -- the plausible net-clearance range in metres), and
+#'   `stroke_quality_weights` (a named list: `speed`, `zone`, `clearance`).
 #' @export
 dq_params <- function() {
   list(
@@ -107,7 +114,8 @@ dq_params <- function() {
     pause_split_regimes = c("forehand_cross_court", "backhand_cross_court", "net_volley"),
     split_requires_starter_next = TRUE,
     min_net_clearance_m = -1,
-    max_net_clearance_m = 5
+    max_net_clearance_m = 5,
+    stroke_quality_weights = list(speed = 1, zone = 1, clearance = 0)
   )
 }
 
