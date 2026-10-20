@@ -33,3 +33,9 @@ The documented, stable interface for derived data; see \link{rallyr-api} for the
 columns, the stability policy and what each is built from. Each returns a
 tibble with a \code{schema_version} attribute.
 }
+\details{
+The attribute is guaranteed only on the value the function returns. Most
+dplyr verbs (a join, \code{dplyr::filter()}, \code{dplyr::bind_rows()}) drop it, so
+do not rely on it after transforming the result; read the version with
+\code{\link[=rallyr_schema_version]{rallyr_schema_version()}}, the stable way.
+}

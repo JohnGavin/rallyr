@@ -6,7 +6,9 @@
 #' and returns a tibble stamped with the attribute `schema_version`
 #' ([rallyr_schema_version()]). The columns and their types are listed once, in
 #' [rallyr_api_schema()], and every result is checked against that list before
-#' it is returned.
+#' it is returned. The `schema_version` attribute is only guaranteed on the
+#' direct return value (transforming the result may drop it); call
+#' [rallyr_schema_version()] to read the version reliably.
 #'
 #' | Function | One row per | Built from |
 #' |---|---|---|
@@ -170,6 +172,11 @@ api_stamp <- function(x, fn) {
 #' The documented, stable interface for derived data; see [rallyr-api] for the
 #' columns, the stability policy and what each is built from. Each returns a
 #' tibble with a `schema_version` attribute.
+#'
+#' The attribute is guaranteed only on the value the function returns. Most
+#' dplyr verbs (a join, `dplyr::filter()`, `dplyr::bind_rows()`) drop it, so
+#' do not rely on it after transforming the result; read the version with
+#' [rallyr_schema_version()], the stable way.
 #'
 #' @param con A DBI connection from [tennis_db_connect()].
 #' @param params A [dq_params()]-shaped list. Pass one to pin the thresholds

@@ -10,7 +10,9 @@ internals they call. Each takes a database connection (\code{\link[=tennis_db_co
 and returns a tibble stamped with the attribute \code{schema_version}
 (\code{\link[=rallyr_schema_version]{rallyr_schema_version()}}). The columns and their types are listed once, in
 \code{\link[=rallyr_api_schema]{rallyr_api_schema()}}, and every result is checked against that list before
-it is returned.
+it is returned. The \code{schema_version} attribute is only guaranteed on the
+direct return value (transforming the result may drop it); call
+\code{\link[=rallyr_schema_version]{rallyr_schema_version()}} to read the version reliably.
 }
 \details{
 \tabular{lll}{
