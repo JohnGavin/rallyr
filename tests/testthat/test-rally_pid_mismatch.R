@@ -62,3 +62,29 @@ test_that("missing columns are an error", {
   f <- fixture_pid()
   expect_error(rally_pid_mismatch(f$rally[, "match_id"], f$shots), "regime")
 })
+
+test_that("a split group whose siblings are partly dropped is still a split", {
+  # 60 strokes (30 by the guest, over the 25 limit) | pause | 3 strokes.
+  # The pause rule makes two pieces; only the short one survives the limit.
+  f <- bind_rallies(mk_rally(c(rep(1, 59), 5, 1, 1), rally_id = 1L))
+  out <- rally_pid_mismatch(f$rally, f$shots)
+  expect_equal(out$n_unchanged, 0L)
+  expect_equal(out$n_split, 1L)
+  expect_equal(out$n_dropped, 0L)
+  expect_equal(out$extra_subrallies, 1L)
+})
+
+test_that("a vendor id that itself ends in _<letter> is not mangled", {
+  f <- bind_rallies(mk_rally(c(1, 1, 1), rally_id = "p_a"))
+  out <- rally_pid_mismatch(f$rally, f$shots)
+  expect_equal(out$n_unchanged, 1L)
+  expect_equal(out$n_dropped, 0L)
+})
+
+test_that("a group split into more than 26 pieces is counted once", {
+  f <- bind_rallies(mk_rally(c(rep(c(1, 5), 27), 1), rally_id = 1L))
+  out <- rally_pid_mismatch(f$rally, f$shots)
+  expect_equal(out$n_pid_groups, 1L)
+  expect_equal(out$n_split, 1L)
+  expect_equal(out$extra_subrallies, 27L)
+})

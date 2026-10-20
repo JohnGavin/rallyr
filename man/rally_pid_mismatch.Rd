@@ -32,7 +32,8 @@ feeder).}
 A tibble, one row per \code{match_id} and \code{regime}, ordered by
 \code{disagreement_count} then \code{disagreement_pct} (both descending):
 \code{n_pid_groups}, \code{n_unchanged}, \code{n_split}, \code{n_dropped},
-\code{extra_subrallies} (pieces created beyond one per split group),
+\code{extra_subrallies} (pieces the pause rule made beyond one, per surviving
+split group),
 \code{disagreement_count} (\code{n_split + n_dropped}) and \code{disagreement_pct}
 (percent of vendor groups, one decimal). Zero rows for empty input.
 }
@@ -46,10 +47,11 @@ the biggest mismatches can be checked against video rather than reasoned
 about informally.
 }
 \details{
-Each vendor group falls into exactly one outcome: \code{unchanged} (one
-corrected rally), \code{split} (two or more corrected pieces: the vendor merged
-several real rallies) or \code{dropped} (no corrected rally: the group was
-implausible after the pause rule). A drill whose pause rule never applies
+Each vendor group falls into exactly one outcome: \code{unchanged} (no pause
+boundary, and it survives), \code{split} (the pause rule cut it into two or more
+pieces and at least one survives: the vendor merged several real rallies;
+a split whose siblings were partly dropped still counts as split) or
+\code{dropped} (no corrected rally: the group was implausible). A drill whose pause rule never applies
 (for example a slow cooperative warm-up) can only show \code{unchanged} or
 \code{dropped}, so a low disagreement there says the rule cannot see a boundary,
 not that the vendor grouping is right.
