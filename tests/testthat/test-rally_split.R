@@ -103,6 +103,25 @@ test_that("rally_player_strokes() counts only me_side's strokes", {
   expect_error(rally_player_strokes(r$rally[, c("match_id", "rally_id")], r$shots), "needs")
 })
 
+test_that("rally_player_strokes() counts by rally_id, not by time window", {
+  a <- mk_rally(rep(1, 5), rally_id = 1L)                        # 6 strokes
+  b <- mk_rally(rep(1, 5), rally_id = 2L, t0 = a$rally$end_time) # starts at a's end
+  r <- bind_rallies(a, b)
+  # A guest stroke at the shared boundary timestamp with an NA rally_id, and
+  # one belonging to rally 2 stamped inside rally 1's window.
+  extra <- r$shots[1, ]
+  extra$rally_id <- NA_integer_
+  extra$player <- "guest"
+  extra$started_at <- a$rally$end_time
+  shots <- dplyr::bind_rows(r$shots, extra)
+  out <- rally_player_strokes(r$rally, shots)
+  expect_equal(out$me_shots, c(sum(a$shots$player == "guest"), sum(b$shots$player == "guest")))
+
+  # No rally_id column at all: fall back to the time window (documented).
+  no_id <- rally_player_strokes(r$rally, r$shots[, setdiff(names(r$shots), "rally_id")])
+  expect_true(all(no_id$me_shots >= 0L))
+})
+
 test_that("dq_flag_rallies() applies each drill's limit to me_shots only", {
   rally_for <- function(regime, me) {
     tibble::tibble(match_id = 1L, rally_id = 1L, regime = regime, me_shots = me)

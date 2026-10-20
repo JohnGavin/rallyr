@@ -132,13 +132,16 @@ rally_split_gap_sec <- function(regime, params = dq_params()) {
 #'
 #' A rally's `n_shots` counts both players' strokes; the stroke limits count
 #' the "me" side's only. A stroke belongs to a rally when it is in the same
-#' match and its `started_at` falls between the rally's `start_time` and
-#' `end_time` (inclusive).
+#' match and carries that rally's `rally_id` (the same rule the split code
+#' uses); a stroke with an `NA` `rally_id` belongs to no rally. Only when
+#' `shot_detail` has no `rally_id` column at all does it fall back to
+#' counting strokes whose `started_at` falls between the rally's `start_time`
+#' and `end_time` (inclusive).
 #'
 #' @param rallies Rally tibble with `match_id`, `rally_id`, `start_time`,
 #'   `end_time`.
 #' @param shot_detail Per-stroke tibble with `match_id`, `player`,
-#'   `started_at`.
+#'   `started_at`, and normally `rally_id`.
 #' @param me_side Which `player` value counts as "me" (`"guest"` by default).
 #' @param col Name of the new column (`"me_shots"` by default).
 #' @return `rallies` with a new integer column `col` (0 when the player hit
@@ -154,14 +157,29 @@ rally_player_strokes <- function(rallies, shot_detail, me_side = "guest", col = 
     cli::cli_abort("{.arg shot_detail} needs {.val {need_s}}.")
   }
   rallies[[col]] <- NULL
-  strokes <- shot_detail[shot_detail$player %in% me_side, c("match_id", "started_at")]
-  keys <- rallies[, need_r]
-  counts <- dplyr::inner_join(
-    keys, strokes,
-    by = dplyr::join_by(match_id, dplyr::between(y$started_at, x$start_time, x$end_time))
-  ) |>
-    dplyr::count(.data$match_id, .data$rally_id, name = col)
-  out <- dplyr::left_join(rallies, counts, by = c("match_id", "rally_id"))
+  mine <- shot_detail[shot_detail$player %in% me_side, ]
+  if ("rally_id" %in% names(shot_detail)) {
+    # Count by rally_id, as the split code does; strokes with an NA rally_id
+    # belong to no rally.
+    counts <- mine[!is.na(mine$rally_id), c("match_id", "rally_id")] |>
+      dplyr::mutate(rally_id = as.character(.data$rally_id)) |>
+      dplyr::count(.data$match_id, .data$rally_id, name = col)
+    rallies$.rid_chr <- as.character(rallies$rally_id)
+    out <- dplyr::left_join(
+      rallies, dplyr::rename(counts, .rid_chr = "rally_id"),
+      by = c("match_id", ".rid_chr")
+    )
+    out$.rid_chr <- NULL
+  } else {
+    # Fallback only when strokes carry no rally_id: count by time window.
+    keys <- rallies[, need_r]
+    counts <- dplyr::inner_join(
+      keys, mine[, c("match_id", "started_at")],
+      by = dplyr::join_by(match_id, dplyr::between(y$started_at, x$start_time, x$end_time))
+    ) |>
+      dplyr::count(.data$match_id, .data$rally_id, name = col)
+    out <- dplyr::left_join(rallies, counts, by = c("match_id", "rally_id"))
+  }
   out[[col]] <- as.integer(dplyr::coalesce(out[[col]], 0L))
   out
 }

@@ -11,7 +11,7 @@ rally_player_strokes(rallies, shot_detail, me_side = "guest", col = "me_shots")
 \code{end_time}.}
 
 \item{shot_detail}{Per-stroke tibble with \code{match_id}, \code{player},
-\code{started_at}.}
+\code{started_at}, and normally \code{rally_id}.}
 
 \item{me_side}{Which \code{player} value counts as "me" (\code{"guest"} by default).}
 
@@ -24,6 +24,9 @@ nothing in that rally).
 \description{
 A rally's \code{n_shots} counts both players' strokes; the stroke limits count
 the "me" side's only. A stroke belongs to a rally when it is in the same
-match and its \code{started_at} falls between the rally's \code{start_time} and
-\code{end_time} (inclusive).
+match and carries that rally's \code{rally_id} (the same rule the split code
+uses); a stroke with an \code{NA} \code{rally_id} belongs to no rally. Only when
+\code{shot_detail} has no \code{rally_id} column at all does it fall back to
+counting strokes whose \code{started_at} falls between the rally's \code{start_time}
+and \code{end_time} (inclusive).
 }
