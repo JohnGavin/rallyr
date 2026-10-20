@@ -46,6 +46,8 @@ and continues to show the "before" picture.
 \details{
 For every rally, in order:
 \enumerate{
+\item Sentinel (placeholder) shot speeds are set to \code{NA}
+(\code{\link[=dq_clean_shot_speed]{dq_clean_shot_speed()}}); the stroke itself stays.
 \item The "me" side's strokes are counted per rally (\code{me_shots}, see
 \code{\link[=rally_player_strokes]{rally_player_strokes()}}) and the per-rally mean stroke speed
 (\code{speed_kmh}) is computed from those strokes only, in km/h.
