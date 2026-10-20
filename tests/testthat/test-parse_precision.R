@@ -70,3 +70,28 @@ test_that("zero-row shot tables carry the precision fields (#20)", {
   withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
   expect_true(all(persisted_cols %in% names(tennis_shot_detail(con))))
 })
+
+# ---- video elapsed time (rallyr#18) ----------------------------------------
+
+test_that("sv_video_elapsed_sec() is hit_frame / fps (#18)", {
+  expect_equal(sv_video_elapsed_sec(sv_fps() * 90), 90)
+  expect_equal(sv_video_elapsed_sec(0), 0)
+  expect_true(is.na(sv_video_elapsed_sec(NULL)))
+  expect_true(is.na(sv_video_elapsed_sec(NA)))
+})
+
+test_that("sv_parse_shots() adds video_elapsed_sec from hit_frame (#18)", {
+  out <- sv_parse_shots(list(fake_shot()))
+  expect_equal(out$video_elapsed_sec, 600 / sv_fps())
+  none <- sv_parse_shots(list(list(id = 1, match_id = 1, started_at = "2000-01-01T10:00:00Z")))
+  expect_true(is.na(none$video_elapsed_sec))
+  expect_true("video_elapsed_sec" %in% names(sv_parse_shots(list())))
+  con <- tennis_db_connect(withr::local_tempfile(fileext = ".duckdb"))
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  expect_true("video_elapsed_sec" %in% names(tennis_shot_detail(con)))
+})
+
+test_that("fmt_video_time() gives m:ss, then h:mm:ss past an hour (#18)", {
+  expect_equal(fmt_video_time(c(0, 5, 65, 599.6, 3599, 3600, 3725, NA)),
+               c("0:00", "0:05", "1:05", "10:00", "59:59", "1:00:00", "1:02:05", "-"))
+})

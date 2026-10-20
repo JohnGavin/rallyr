@@ -46,49 +46,50 @@
       40 session_weather                 temp_c    DOUBLE                2
       41 session_weather           wind_avg_kmh    DOUBLE                3
       42 session_weather          wind_gust_kmh    DOUBLE                4
-      43     shot_detail      bounce_court_side   VARCHAR               13
-      44     shot_detail    bounce_location_lat   VARCHAR               16
-      45     shot_detail   bounce_location_long   VARCHAR               15
-      46     shot_detail               bounce_x    DOUBLE               20
-      47     shot_detail               bounce_y    DOUBLE               21
-      48     shot_detail               bounce_z    DOUBLE               22
-      49     shot_detail         hit_court_side   VARCHAR               12
+      43     shot_detail      bounce_court_side   VARCHAR               14
+      44     shot_detail    bounce_location_lat   VARCHAR               17
+      45     shot_detail   bounce_location_long   VARCHAR               16
+      46     shot_detail               bounce_x    DOUBLE               21
+      47     shot_detail               bounce_y    DOUBLE               22
+      48     shot_detail               bounce_z    DOUBLE               23
+      49     shot_detail         hit_court_side   VARCHAR               13
       50     shot_detail              hit_frame    DOUBLE               11
       51     shot_detail               hit_type   VARCHAR                6
-      52     shot_detail         hit_velocity_x    DOUBLE               23
-      53     shot_detail         hit_velocity_y    DOUBLE               24
-      54     shot_detail         hit_velocity_z    DOUBLE               25
+      52     shot_detail         hit_velocity_x    DOUBLE               24
+      53     shot_detail         hit_velocity_y    DOUBLE               25
+      54     shot_detail         hit_velocity_z    DOUBLE               26
       55     shot_detail               hit_wing   VARCHAR                7
-      56     shot_detail                  hit_x    DOUBLE               17
-      57     shot_detail                  hit_y    DOUBLE               18
-      58     shot_detail                  hit_z    DOUBLE               19
+      56     shot_detail                  hit_x    DOUBLE               18
+      57     shot_detail                  hit_y    DOUBLE               19
+      58     shot_detail                  hit_z    DOUBLE               20
       59     shot_detail               match_id   INTEGER                1
-      60     shot_detail        net_clearance_m    DOUBLE               14
+      60     shot_detail        net_clearance_m    DOUBLE               15
       61     shot_detail                 player   VARCHAR                4
       62     shot_detail               rally_id   INTEGER                3
-      63     shot_detail                 regime   VARCHAR               27
-      64     shot_detail      regime_occurrence   INTEGER               28
-      65     shot_detail          segment_index   INTEGER               26
+      63     shot_detail                 regime   VARCHAR               28
+      64     shot_detail      regime_occurrence   INTEGER               29
+      65     shot_detail          segment_index   INTEGER               27
       66     shot_detail                shot_id   INTEGER                2
       67     shot_detail                shot_in   BOOLEAN               10
       68     shot_detail         shot_speed_mph    DOUBLE                9
       69     shot_detail              spin_type   VARCHAR                8
       70     shot_detail             started_at   VARCHAR                5
-      71   shot_segments           duration_min    DOUBLE                5
-      72   shot_segments               end_time   VARCHAR                4
-      73   shot_segments           guest_in_pct    DOUBLE               14
-      74   shot_segments   guest_speed_mean_mph    DOUBLE               12
-      75   shot_segments guest_speed_median_mph    DOUBLE               13
-      76   shot_segments               match_id   INTEGER               15
-      77   shot_segments        n_guest_gs_left   INTEGER               10
-      78   shot_segments       n_guest_gs_right   INTEGER               11
-      79   shot_segments          n_guest_shots   INTEGER                8
-      80   shot_segments           n_host_shots   INTEGER                7
-      81   shot_segments                n_shots   INTEGER                6
-      82   shot_segments                 regime   VARCHAR                2
-      83   shot_segments      regime_occurrence   INTEGER                9
-      84   shot_segments          segment_index   INTEGER                1
-      85   shot_segments             start_time   VARCHAR                3
+      71     shot_detail      video_elapsed_sec    DOUBLE               12
+      72   shot_segments           duration_min    DOUBLE                5
+      73   shot_segments               end_time   VARCHAR                4
+      74   shot_segments           guest_in_pct    DOUBLE               14
+      75   shot_segments   guest_speed_mean_mph    DOUBLE               12
+      76   shot_segments guest_speed_median_mph    DOUBLE               13
+      77   shot_segments               match_id   INTEGER               15
+      78   shot_segments        n_guest_gs_left   INTEGER               10
+      79   shot_segments       n_guest_gs_right   INTEGER               11
+      80   shot_segments          n_guest_shots   INTEGER                8
+      81   shot_segments           n_host_shots   INTEGER                7
+      82   shot_segments                n_shots   INTEGER                6
+      83   shot_segments                 regime   VARCHAR                2
+      84   shot_segments      regime_occurrence   INTEGER                9
+      85   shot_segments          segment_index   INTEGER                1
+      86   shot_segments             start_time   VARCHAR                3
 
 # merge_same_day_sessions() output is stable
 

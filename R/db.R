@@ -159,6 +159,7 @@ tennis_shot_detail <- function(con) {
       shot_speed_mph = numeric(0),
       shot_in        = logical(0),
       hit_frame            = numeric(0),
+      video_elapsed_sec    = numeric(0),
       hit_court_side       = character(0),
       bounce_court_side    = character(0),
       net_clearance_m      = numeric(0),

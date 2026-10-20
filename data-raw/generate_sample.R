@@ -110,7 +110,7 @@ if (identical(Sys.getenv("SYNTHETIC_SAMPLE_SKIP_LOAD"), "")) {
       # Precision fields (rallyr#20). All hand-picked random ranges, not fitted.
       # They are drawn from their own per-shot seed so the main RNG stream
       # (and with it every pre-existing column) is unchanged by their addition.
-      # hit_frame is time since session start at a nominal 60 fps; the
+      # hit_frame is time since session start at the package's pinned fps; the
       # velocity components are a random unit direction scaled to `speed`.
       extra <- withr::with_seed((match_id %% 100000L) * 1000L + shot_id_ctr, {
         dir <- stats::runif(3, -1, 1)
@@ -126,6 +126,7 @@ if (identical(Sys.getenv("SYNTHETIC_SAMPLE_SKIP_LOAD"), "")) {
           bounce = c(round(stats::runif(1, -4, 4), 2), round(stats::runif(1, -12, 12), 2))
         )
       })
+      hit_frame <- round(as.numeric(difftime(started_at, session_start, units = "secs")) * rallyr:::sv_fps())
       near_side <- if (player == "guest") "near" else "far"
       far_side  <- if (player == "guest") "far" else "near"
 
@@ -141,7 +142,8 @@ if (identical(Sys.getenv("SYNTHETIC_SAMPLE_SKIP_LOAD"), "")) {
         spin_type      = spin_type,
         shot_speed_mph = round(speed, 1),
         shot_in        = stats::runif(1) < 0.80,
-        hit_frame            = round(as.numeric(difftime(started_at, session_start, units = "secs")) * 60),
+        hit_frame            = hit_frame,
+        video_elapsed_sec    = hit_frame / rallyr:::sv_fps(),
         hit_court_side       = near_side,
         bounce_court_side    = far_side,
         net_clearance_m      = extra$net_clearance_m,
@@ -211,7 +213,7 @@ if (identical(Sys.getenv("SYNTHETIC_SAMPLE_SKIP_LOAD"), "")) {
   shot_rows <- shots[, c(
     "match_id", "shot_id", "rally_id", "player", "started_at", "hit_type", "hit_wing", "spin_type",
     "shot_speed_mph", "shot_in",
-    "hit_frame", "hit_court_side", "bounce_court_side", "net_clearance_m",
+    "hit_frame", "video_elapsed_sec", "hit_court_side", "bounce_court_side", "net_clearance_m",
     "bounce_location_long", "bounce_location_lat",
     "hit_x", "hit_y", "hit_z", "bounce_x", "bounce_y", "bounce_z",
     "hit_velocity_x", "hit_velocity_y", "hit_velocity_z",

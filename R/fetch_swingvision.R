@@ -177,6 +177,7 @@ sv_parse_shots <- function(shots) {
       shot_speed_mph  = numeric(0),
       shot_in         = logical(0),
       hit_frame            = numeric(0),
+      video_elapsed_sec    = numeric(0),
       hit_court_side       = character(0),
       bounce_court_side    = character(0),
       net_clearance_m      = numeric(0),
@@ -202,6 +203,7 @@ sv_parse_shots <- function(shots) {
       shot_speed_mph = sv_speed_mph(sh$hit_velocity),
       shot_in        = sv_shot_in(sh$net_type, sh$bounce_location_long, sh$bounce_location_lat),
       hit_frame            = sv_num(sh$hit_frame),
+      video_elapsed_sec    = sv_video_elapsed_sec(sh$hit_frame),
       hit_court_side       = sv_chr(sh$hit_court_side),
       bounce_court_side    = sv_chr(sh$bounce_court_side),
       net_clearance_m      = sv_net_clearance_m(sh$net_location),
@@ -259,6 +261,35 @@ sv_time <- function(x) {
   if (is.null(x)) return(as.POSIXct(NA))
   as.POSIXct(x, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
 }
+#' Video frame rate used to turn a frame number into elapsed time
+#'
+#' A pinned constant, not a per-recording fit: frame rates are stable across
+#' recordings, so a recording whose timing disagrees with it is a
+#' data-quality signal, not something to absorb (see [sv_video_drift()]).
+#'
+#' @return A length-1 numeric, frames per second.
+#' @keywords internal
+sv_fps <- function() 60.006
+
+#' Elapsed time since the start of the video, from a shot's `hit_frame`
+#'
+#' Frame 0 is the start of the recorded video, so `hit_frame / fps` is a time
+#' a person can type into a video player to find the stroke. It does not
+#' depend on the match-level start time, which is not stable across fetches
+#' (see [sv_parse_match()]). Video time restarts at 0 for each recording: a
+#' stroke is identified by recording plus time, never by time alone. Use
+#' [fmt_video_time()] for display.
+#'
+#' @param hit_frame Raw `hit_frame` field from one shot object (may be
+#'   `NULL`).
+#' @return A length-1 numeric (seconds), or `NA_real_` if unavailable.
+#' @keywords internal
+sv_video_elapsed_sec <- function(hit_frame) {
+  f <- sv_num(hit_frame)
+  if (is.na(f)) return(NA_real_)
+  f / sv_fps()
+}
+
 #' Net-clearance height, in metres, from a shot's `net_location`
 #'
 #' The third element of `net_location` is the ball's height as it crosses the

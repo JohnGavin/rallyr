@@ -109,7 +109,7 @@ test_that("synthetic shots carry the persisted precision fields (#20)", {
   data <- env$generate_synthetic_sample(n_sessions = 1, seed = 7)
   sd <- data$shot_detail
   cols <- c(
-    "hit_frame", "hit_court_side", "bounce_court_side", "net_clearance_m",
+    "hit_frame", "video_elapsed_sec", "hit_court_side", "bounce_court_side", "net_clearance_m",
     "bounce_location_long", "bounce_location_lat", "hit_x", "hit_y", "hit_z",
     "bounce_x", "bounce_y", "bounce_z",
     "hit_velocity_x", "hit_velocity_y", "hit_velocity_z"
