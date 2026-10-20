@@ -20,7 +20,7 @@
 #' These are FLAGS, not corrections -- a flagged row is surfaced for review,
 #' never silently dropped, altered, or excluded from the underlying database
 #' tables. Only chart-level *display* filtering (with an explicit note of how
-#' many rows were excluded and why) may skip a
+#' many rows were excluded and why, see [dq_excluded_count()]) may skip a
 #' flagged row.
 #'
 #' **The stroke limit only flags; it never splits.** The pause rule runs on
@@ -207,6 +207,30 @@ dq_flag_rallies <- function(rallies, rally_speed_kmh) {
     TRUE ~ NA_character_
   )
   rallies
+}
+
+#' Count the rallies a data-quality flag touched
+#'
+#' The "N of M rallies excluded" figure shown next to a chart. It counts the
+#' raw rallies that were flagged (`sum(!is.na(flag_reason))`), NOT a
+#' row-count difference such as `n_flagged - nrow(corrected)`: a flagged
+#' rally that [dq_corrected_rallies()] splits into two surviving sub-rallies
+#' increases the corrected row count, so that difference can go negative
+#' ("-5 of 937 rallies excluded"). Compute the flagged set once with
+#' [dq_flag_rallies()] and reuse this count for every chart and audit table.
+#'
+#' @param rallies_flagged Output of [dq_flag_rallies()] (needs a
+#'   `flag_reason` column).
+#' @return A single non-negative integer.
+#' @export
+dq_excluded_count <- function(rallies_flagged) {
+  if (!"flag_reason" %in% names(rallies_flagged)) {
+    cli::cli_abort(c(
+      "x" = "{.arg rallies_flagged} needs a {.field flag_reason} column.",
+      "i" = "Build it with {.fn dq_flag_rallies}."
+    ))
+  }
+  sum(!is.na(rallies_flagged$flag_reason))
 }
 
 #' Inter-stroke gap times within every rally

@@ -197,3 +197,30 @@ test_that("dq_corrected_rallies() drops a rally holding one implausible stroke",
   r$shots$shot_speed_mph[] <- 30
   expect_equal(nrow(dq_corrected_rallies(r$rally, r$shots)), 1L)
 })
+
+# ---- the "N of M rallies excluded" count -----------------------------------
+
+test_that("dq_excluded_count() is never negative when a flagged rally splits into survivors", {
+  # 80 strokes (40 me, over the net-volley limit of 25) with one qualifying
+  # pause before a feeder stroke: two pieces of 20 me-strokes, both kept.
+  r <- mk_rally(c(rep(1, 39), 5, rep(1, 39)), regime = "net_volley")
+  corrected <- dq_corrected_rallies(r$rally, r$shots)
+  expect_equal(nrow(corrected), 2L)
+
+  flagged <- dq_flag_rallies(
+    rally_with_counts(r),
+    tibble::tibble(match_id = 1L, rally_id = 1L, speed_kmh = 30)
+  )
+  expect_equal(sum(!is.na(flagged$flag_reason)), 1L)
+  # The row-count difference the count replaces: it goes negative here.
+  expect_lt(sum(!is.na(flagged$flag_reason)) - nrow(corrected), 0L)
+  expect_equal(dq_excluded_count(flagged), 1L)
+  expect_gte(dq_excluded_count(flagged), 0L)
+})
+
+test_that("dq_excluded_count() counts raw flagged rallies and validates its input", {
+  f <- tibble::tibble(rally_id = 1:4, flag_reason = c(NA, "rally > 25 strokes (drill limit)", NA, "mean stroke speed > 100 km/h"))
+  expect_equal(dq_excluded_count(f), 2L)
+  expect_equal(dq_excluded_count(f[0, ]), 0L)
+  expect_error(dq_excluded_count(tibble::tibble(rally_id = 1L)), "flag_reason")
+})

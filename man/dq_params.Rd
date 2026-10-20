@@ -41,7 +41,7 @@ single-wing cross-court drills (\code{forehand_cross_court},
 These are FLAGS, not corrections -- a flagged row is surfaced for review,
 never silently dropped, altered, or excluded from the underlying database
 tables. Only chart-level \emph{display} filtering (with an explicit note of how
-many rows were excluded and why) may skip a
+many rows were excluded and why, see \code{\link[=dq_excluded_count]{dq_excluded_count()}}) may skip a
 flagged row.
 
 \strong{The stroke limit only flags; it never splits.} The pause rule runs on
