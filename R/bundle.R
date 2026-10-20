@@ -397,12 +397,13 @@ bundle_my_side <- function(match, me) {
 bundle_empty_tables <- function() {
   shots <- sv_parse_shots(list())
   shots$ended_at <- NULL
+  shots$match_id <- integer(0)
   shots$segment_index <- integer(0)
   shots$regime <- character(0)
   shots$regime_occurrence <- numeric(0)
   list(
     shot_segments = tibble::tibble(
-      match_id = numeric(0), segment_index = integer(0), regime = character(0),
+      match_id = integer(0), segment_index = integer(0), regime = character(0),
       regime_occurrence = numeric(0), start_time = as.POSIXct(character(0), tz = "UTC"),
       end_time = as.POSIXct(character(0), tz = "UTC"), duration_min = numeric(0),
       n_shots = numeric(0), n_host_shots = numeric(0), n_guest_shots = numeric(0),
@@ -412,7 +413,7 @@ bundle_empty_tables <- function() {
     ),
     shot_detail = shots,
     rallies = tibble::tibble(
-      match_id = numeric(0), rally_id = numeric(0),
+      match_id = integer(0), rally_id = numeric(0),
       start_time = as.POSIXct(character(0), tz = "UTC"),
       end_time = as.POSIXct(character(0), tz = "UTC"), duration_sec = numeric(0),
       n_shots = numeric(0), segment_index = numeric(0), regime = character(0),
@@ -496,6 +497,10 @@ bundle_session_tables <- function(s, me) {
     match, bundle_unwrap(s$stats), me = me_exact,
     token = if (is.null(s$token)) NA_character_ else as.character(s$token)
   )
+  # The derived-data schema types `match_id` as integer (as the database
+  # returns it); keep it a double only when an id would not fit.
+  fits <- !is.na(row$match_id) && abs(row$match_id) <= .Machine$integer.max && row$match_id == round(row$match_id)
+  if (fits) row$match_id <- as.integer(row$match_id)
   shots <- sv_parse_shots(bundle_unwrap(s$shots))
   out <- list(matches = row, shot_segments = NULL, shot_detail = NULL, rallies = NULL)
   if (nrow(shots) == 0L) return(out)
