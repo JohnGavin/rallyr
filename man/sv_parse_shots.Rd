@@ -16,8 +16,10 @@ A tibble, one row per shot, sorted by \code{started_at} ascending.
 \description{
 Pure function over an already-fetched JSON list (no network) so it is unit
 testable against committed fixtures. \code{spin_type} is categorical (e.g.
-\code{flat}/\code{topspin}/\code{slice}) -- there is no numeric spin-rate field in this
-endpoint (see rallyr#2).
+\code{flat}/\code{topspin}/\code{slice}) -- there is no numeric spin-rate field (rpm) in
+this endpoint, and the vendor's own spreadsheet export is categorical too,
+so do not look for one (see rallyr#2). A chart or metric that wants a spin
+rate should show that gap rather than drop the question.
 }
 \details{
 \code{shot_in} is derived from \code{net_type}/\code{bounce_location_long}/

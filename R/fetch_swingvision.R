@@ -1,4 +1,9 @@
 #' SwingVision public share API base URL
+#'
+#' This is the vendor's share API, which is undocumented and unofficial: it
+#' has no published contract, so its endpoints and fields can change without
+#' notice. Everything this package reads from it is parsed defensively (an
+#' absent field becomes `NA`).
 #' @keywords internal
 sv_api_base <- function() "https://api.swing.tennis/v1"
 
@@ -48,6 +53,17 @@ sv_get <- function(url) {
 #'
 #' Pure function over already-fetched JSON lists (no network) so it is unit
 #' testable against committed fixtures.
+#'
+#' **Start times are not a stable anchor.** `played_at` (and `start_time`)
+#' come from the match-level `started_at` field, which can change between
+#' fetches of the same match (by minutes in one observed case). Other
+#' candidate fields mean different things: `video_started_at` is when the
+#' recording began, `first_point_at` is when the first point was tagged, and
+#' the first tracked stroke is later again (set-up and warm-up before any
+#' stroke is captured). None is interchangeable with another, so do not use
+#' the match-level start as the anchor for "elapsed into session". Prefer a
+#' property of the recording itself: `video_elapsed_sec` from the frame
+#' number (see [sv_parse_shots()]), or the first tracked stroke's timestamp.
 #'
 #' @param match The `data` element of `/v1/matches/{token}`.
 #' @param stats The `data` element of `/v1/matches/{token}/stats`.
@@ -129,8 +145,10 @@ fetch_swingvision_shots <- function(url_or_token) {
 #'
 #' Pure function over an already-fetched JSON list (no network) so it is unit
 #' testable against committed fixtures. `spin_type` is categorical (e.g.
-#' `flat`/`topspin`/`slice`) -- there is no numeric spin-rate field in this
-#' endpoint (see rallyr#2).
+#' `flat`/`topspin`/`slice`) -- there is no numeric spin-rate field (rpm) in
+#' this endpoint, and the vendor's own spreadsheet export is categorical too,
+#' so do not look for one (see rallyr#2). A chart or metric that wants a spin
+#' rate should show that gap rather than drop the question.
 #'
 #' `shot_in` is derived from `net_type`/`bounce_location_long`/
 #' `bounce_location_lat` (see [sv_shot_in()]) -- the `/shots` payload has no
