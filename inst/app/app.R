@@ -22,18 +22,22 @@ library(ggplot2)
 
 app_dir <- shiny::getShinyOption("appDir", default = getwd())
 bundled_sources <- file.path(app_dir, "pkg_R", "rallyr_app_sources.R")
+# The package name is held in a variable on purpose: the browser runtime scans
+# the app's code for package names and would otherwise try to download a
+# WebAssembly build of rallyr itself (one request to the package repository).
+rallyr_pkg <- "rallyr"
 if (file.exists(bundled_sources)) {
   .data <- rlang::.data
   source(bundled_sources, local = globalenv())
   api_base <- function() sv_api_base()
 } else {
-  library(rallyr)
-  api_base <- function() getFromNamespace("sv_api_base", "rallyr")()
+  library(rallyr_pkg, character.only = TRUE)
+  api_base <- function() utils::getFromNamespace("sv_api_base", rallyr_pkg)()
 }
 
 sample_path <- local({
   bundled <- file.path(app_dir, "data", "synthetic_sample_bundle.json.gz")
-  if (file.exists(bundled)) bundled else system.file("extdata", "synthetic_sample_bundle.json.gz", package = "rallyr")
+  if (file.exists(bundled)) bundled else system.file("extdata", "synthetic_sample_bundle.json.gz", package = rallyr_pkg)
 })
 sample_bundle <- bundle_read(sample_path)
 sample_player <- "Sample Player"

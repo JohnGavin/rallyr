@@ -20,7 +20,8 @@
 #
 # What this does NOT show: that the vendored runtime (Shinylive, WebAssembly R,
 # pkgdown's own assets: the folders in `skip_dirs` and the files in
-# `skip_files`; pkgdown.js, for one, fetches the site's own search index)
+# `skip_files`; pkgdown.js, for one, fetches the site's own search index, and
+# Shinylive's service worker names its default package repositories)
 # makes no request to another origin, and a
 # <meta> policy does not bind workers. That is what the browser check
 # (tools/check_app_requests.mjs) observes. This script covers the code we write.
@@ -162,7 +163,7 @@ scan_html <- function(html, allowed_resources, file, require_csp) {
 check_site_privacy <- function(dir, allowed_navigation = character(0), allowed_resources = character(0),
                                csp_dir = NULL,
                                skip_dirs = c("shinylive", "deps", "node_modules", ".git"),
-                               skip_files = c("search.json", "sitemap.xml", "pkgdown.yml", "pkgdown.js", "lightswitch.js", "katex-auto.js")) {
+                               skip_files = c("search.json", "sitemap.xml", "pkgdown.yml", "pkgdown.js", "lightswitch.js", "katex-auto.js", "shinylive-sw.js")) {
   files <- list.files(dir, recursive = TRUE, full.names = TRUE, all.files = TRUE)
   rel <- substring(files, nchar(dir) + 2L)
   parts <- strsplit(rel, "/", fixed = TRUE)

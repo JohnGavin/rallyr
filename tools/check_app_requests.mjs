@@ -56,7 +56,8 @@ let browser;
 const requests = [];
 let status = 0;
 try {
-  browser = await chromium.launch();
+  // CHROME_PATH: use an installed Chrome instead of Playwright's own Chromium.
+  browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined });
   const context = await browser.newContext();
   context.on("request", (r) => requests.push({ url: r.url(), by: r.serviceWorker() ? "service-worker" : "page" }));
 
