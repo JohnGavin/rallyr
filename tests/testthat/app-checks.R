@@ -43,8 +43,13 @@ run_app_checks <- function(app_dir) {
     stopifnot("sample was not read in steps" = isTRUE(prime$ready), prime$total == 6L)
     d <- derived()
     stopifnot(nrow(d$sessions) == 6L, !is.null(d$session_metrics), nrow(d$corrected_rallies) > 0L)
-    stopifnot("trend plot did not render" = !is.null(output$plot_trend$src))
-    stopifnot("gap plot did not render" = !is.null(output$plot_gap$src))
+    # every plot renders (a plot that errors has no `src`)
+    for (id in c("plot_trend", "plot_rally", "plot_speed", "plot_net", "plot_gap")) {
+      stopifnot(
+        "a plot did not render" = !is.null(output[[id]]$src),
+        "a plot reported an error" = is.null(output[[id]]$error)
+      )
+    }
 
     # 2. A name that is not in the data gives a message, not a crash.
     session$setInputs(me = "Nobody At All")
@@ -88,6 +93,35 @@ run_app_checks <- function(app_dir) {
     # 7. Their own bundle can be uploaded to replace what is shown.
     session$setInputs(bundle_file = drop_files(path, "my_bundle.json.gz"))
     stopifnot(length(bundle()$sessions) == 2L)
+
+    # 8. Text the user controls (file names, player names) is escaped, never
+    #    inserted as HTML.
+    html_of <- function(x) paste(unlist(x), collapse = " ")
+    evil_file <- "<script>alert(1)</script>.json"
+    session$setInputs(raw_files = drop_files(unname(s2), c(evil_file, "b.json", "c.json")))
+    detect <- html_of(output$raw_detect)
+    stopifnot(
+      "file name was not escaped" = !grepl("<script>", detect, fixed = TRUE),
+      "file name is not shown" = grepl("&lt;script&gt;", detect, fixed = TRUE)
+    )
+    evil_name <- "<script>alert(2)</script>"
+    s3 <- sample$sessions[[3]]
+    s3$match$data$guest_name <- evil_name
+    p3 <- write_payloads(s3, work, 7000003, "three")
+    session$setInputs(raw_files = drop_files(unname(p3)))
+    session$setInputs(merge = 5)
+    session$setInputs(me = evil_name)
+    for (k in 61:100) {
+      session$setInputs(tick = k)
+      if (prime$ready) break
+    }
+    stopifnot("the bundle was not updated" = length(bundle()$sessions) == 3L)
+    stopifnot("the player was not read" = nrow(derived()$sessions) == 1L)
+    for (id in c("status", "merge_msg", "merge_summary", "merge_table", "summary", "sessions", "api_links")) {
+      stopifnot(
+        "a player name reached the page as HTML" = !grepl("<script>", html_of(output[[id]]), fixed = TRUE)
+      )
+    }
   })
   invisible(TRUE)
 }
