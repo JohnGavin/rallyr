@@ -69,6 +69,11 @@ stroke_quality_session <- function(shot_detail, matches, params = dq_params(),
     next_hit_wing = dplyr::lead(.data$hit_wing),
     .by = c("match_id", "rally_id")
   )
+  # Strokes with no rally id would be grouped together and paired with
+  # unrelated neighbours: no "next stroke" is known for them.
+  no_rally <- is.na(d$rally_id)
+  d$next_player[no_rally] <- NA
+  d$next_hit_wing[no_rally] <- NA
   d$zone <- zone_score_numeric(cross_court_zone_score(
     d$regime, d$player, d$bounce_location_long, d$bounce_location_lat,
     d$next_player, d$next_hit_wing, feeder_right_handed,

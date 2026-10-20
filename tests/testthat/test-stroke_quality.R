@@ -120,3 +120,14 @@ test_that("trend sorts by date and rejects a missing column (#13)", {
   expect_equal(tr$baseline, c(NA, 3))
   expect_error(stroke_quality_trend(tibble::tibble(a = 1)), "quality")
 })
+
+test_that("strokes with no rally id are not paired with their neighbours (#13)", {
+  sd <- mk_q(1, speeds = c(40, 60))
+  m <- mk_matches(1, "2000-01-01")
+  paired <- stroke_quality_session(sd, m)
+  expect_equal(paired$zone_score, 1)
+  sd$rally_id <- NA
+  unpaired <- stroke_quality_session(sd, m)
+  expect_true(is.na(unpaired$zone_score))
+  expect_equal(unpaired$speed_mph, 50)
+})
