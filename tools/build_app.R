@@ -69,7 +69,7 @@ if (is.null(runtime)) {
   quit(status = 3)
 }
 named <- app_package_refs(file.path(root, "R"), file.path(app_build, "app.R"))
-needed <- setdiff(named, c(runtime, "rallyr"))
+needed <- setdiff(named, runtime)
 message("Packages the app names: ", paste(named, collapse = ", "))
 message("Needing a WebAssembly build: ", if (length(needed)) paste(needed, collapse = ", ") else "(none)")
 if (length(needed) == 0L || !all(needed %in% bundled)) {

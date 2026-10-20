@@ -4,12 +4,15 @@
 # The site: pkgdown (README, reference, the vignette) at the root, and the
 # Shinylive app (R running in the browser, no server) at /app/.
 #
-# Privacy checks run on every build, before anything is uploaded:
+# Privacy checks run on every build; a failure stops the deploy job:
 #  1. tools/check_site_privacy.R scans the code we ship for requests to other
 #     sites and checks the app pages carry the Content-Security-Policy;
 #  2. tools/check_app_requests.mjs loads the built site in a real browser and
-#     fails if any request (workers included) goes to another origin, or if the
-#     app does not draw a chart (then the result is indeterminate, not a pass).
+#     fails if any request (workers and the service worker included) goes to
+#     another origin, or if the app does not draw a chart or cannot be driven
+#     through an upload and a merge (then the result is indeterminate, not a
+#     pass). It first runs against tools/fixtures/outside-requests, which is
+#     built to fail, to show the check can go red.
 #
 # This workflow does not enable Pages. The repository owner does that once:
 # Settings > Pages > Source: GitHub Actions. Until then the deploy job fails
@@ -26,23 +29,25 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels an older run of a branch or pull request, but never a
+# run on main: a half-finished deploy is worse than a queued one.
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: r-lib/actions/setup-r@v2
+      - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         with:
           use-public-rspm: true
 
-      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-pandoc@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
 
-      - uses: r-lib/actions/setup-r-dependencies@v2
+      - uses: r-lib/actions/setup-r-dependencies@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         with:
           needs: website
           extra-packages: |
@@ -65,19 +70,43 @@ jobs:
       - name: Privacy check of the code we ship (static)
         run: Rscript tools/check_site_privacy.R _site --csp-dir=app
 
-      - uses: actions/setup-node@v4
+      # The artifact is packed here, before the browser tooling is installed,
+      # so nothing that runs after this step can change what is uploaded.
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: _site
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
 
-      - name: Privacy check of every request (real browser)
+      - name: Install the browser tooling
         run: |
           npm install --no-save --no-package-lock playwright@1.49.1
           npx playwright install --with-deps chromium
-          node tools/check_app_requests.mjs _site
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
+      # A positive control: a page that, on purpose, requests outside origins
+      # from the page, a worker and a service worker. The check must fail on it
+      # and name all three; if it does not, a green run below means nothing.
+      - name: Positive control for the browser check (must fail)
+        run: |
+          set +e
+          node tools/check_app_requests.mjs tools/fixtures/outside-requests --fixture > "$RUNNER_TEMP/control.txt" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/control.txt"
+          if [ "$code" -ne 1 ]; then
+            echo "The control should exit 1 and exited $code."
+            exit 1
+          fi
+          for seen in "OUTSIDE (page): http://outside-page.invalid" \
+                      "OUTSIDE (page): http://outside-worker.invalid" \
+                      "OUTSIDE (service-worker): http://outside-sw.invalid"; do
+            grep -qF "$seen" "$RUNNER_TEMP/control.txt" || { echo "The control did not report: $seen"; exit 1; }
+          done
+
+      - name: Privacy check of every request (real browser)
+        run: node tools/check_app_requests.mjs _site
 
   deploy:
     needs: build
@@ -91,4 +120,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
