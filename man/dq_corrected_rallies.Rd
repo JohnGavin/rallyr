@@ -64,7 +64,9 @@ stroke (\code{max_individual_stroke_speed_kmh}).
 \item The stroke limit only FLAGS. There is no forced split: a rally, or a
 sub-rally, still over its regime's limit (including a rally with no
 qualifying pause) is left out and stays flagged. A valid sibling
-sub-rally is kept.
+sub-rally is kept. Because a stroke-count flag hides any speed reason,
+each sub-rally is also re-checked against the mean-speed and
+individual-stroke-speed limits and dropped if it fails either.
 \item Every unflagged rally with no qualifying pause passes through
 unchanged, with \code{speed_kmh} attached.
 }

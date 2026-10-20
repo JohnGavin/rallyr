@@ -200,6 +200,32 @@ test_that("dq_corrected_rallies() drops a rally holding one implausible stroke",
   expect_equal(nrow(dq_corrected_rallies(r$rally, r$shots)), 1L)
 })
 
+test_that("an over-limit rally that also has a speed artefact: the artefact piece is dropped after the split", {
+  # 80 strokes (40 me, over the net-volley limit of 25), one qualifying pause
+  # before a feeder stroke: two pieces of 20 me-strokes. The flag reason is
+  # "strokes" (it takes precedence), so the speed checks must be re-applied
+  # to each piece.
+  r <- mk_rally(c(rep(1, 39), 5, rep(1, 39)), regime = "net_volley")
+  me <- which(r$shots$player == "guest")
+  r$shots$shot_speed_mph[me[1]] <- 120        # 193 km/h, inside piece a
+  out <- dq_corrected_rallies(r$rally, r$shots)
+  expect_equal(out$rally_id, "1_b")
+  expect_true(all(out$speed_kmh < 100))
+
+  # Control: without the artefact both pieces survive.
+  r$shots$shot_speed_mph[me[1]] <- 30
+  expect_equal(dq_corrected_rallies(r$rally, r$shots)$rally_id, c("1_a", "1_b"))
+})
+
+test_that("a split piece whose mean speed is implausible is dropped; its sibling is kept", {
+  r <- mk_rally(c(rep(1, 39), 5, rep(1, 39)), regime = "net_volley")
+  second <- r$shots$started_at >= min(r$shots$started_at) + 39 + 5
+  # 65 mph = 104.6 km/h mean in piece b only (no stroke over 160 km/h).
+  r$shots$shot_speed_mph[second & r$shots$player == "guest"] <- 65
+  out <- dq_corrected_rallies(r$rally, r$shots)
+  expect_equal(out$rally_id, "1_a")
+})
+
 # ---- the "N of M rallies excluded" count -----------------------------------
 
 test_that("dq_excluded_count() is never negative when a flagged rally splits into survivors", {

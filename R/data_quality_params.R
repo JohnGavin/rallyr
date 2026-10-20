@@ -387,7 +387,9 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 #' 5. The stroke limit only FLAGS. There is no forced split: a rally, or a
 #'    sub-rally, still over its regime's limit (including a rally with no
 #'    qualifying pause) is left out and stays flagged. A valid sibling
-#'    sub-rally is kept.
+#'    sub-rally is kept. Because a stroke-count flag hides any speed reason,
+#'    each sub-rally is also re-checked against the mean-speed and
+#'    individual-stroke-speed limits and dropped if it fails either.
 #' 6. Every unflagged rally with no qualifying pause passes through
 #'    unchanged, with `speed_kmh` attached.
 #'
@@ -453,7 +455,8 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
           duration_sec      = as.numeric(difftime(max(sub_shots$started_at), min(sub_shots$started_at), units = "secs")),
           start_time        = min(sub_shots$started_at),
           end_time          = max(sub_shots$started_at),
-          speed_kmh         = if (nrow(sub_me) > 0L) mean(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_
+          speed_kmh         = if (nrow(sub_me) > 0L) mean(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_,
+          max_speed_kmh     = if (nrow(sub_me) > 0L && !all(is.na(sub_me$shot_speed_mph))) max(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_
         )
       })
       dplyr::bind_rows(sub_rows)
@@ -468,7 +471,14 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
     max_strokes_vec <- rally_stroke_threshold(split_result$regime, params)
     # A sub-rally still over its own regime's limit stays flagged and is left
     # out -- per-row, so a valid sibling is kept.
-    split_result <- split_result[split_result$me_shots <= max_strokes_vec, ]
+    # The same goes for the speed checks: a rally flagged for its stroke count
+    # carries only that reason, so a speed artefact is re-checked per piece.
+    ok_mean <- is.na(split_result$speed_kmh) | split_result$speed_kmh <= params$max_mean_stroke_speed_kmh
+    ok_max  <- is.na(split_result$max_speed_kmh) | split_result$max_speed_kmh <= params$max_individual_stroke_speed_kmh
+    split_result <- split_result[split_result$me_shots <= max_strokes_vec & ok_mean & ok_max, ]
+    split_result$max_speed_kmh <- NULL
+  } else if ("max_speed_kmh" %in% names(split_result)) {
+    split_result$max_speed_kmh <- NULL
   }
 
   # Unflagged and no qualifying pause: passes through unchanged. Flagged and
