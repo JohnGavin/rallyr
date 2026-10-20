@@ -157,3 +157,43 @@ test_that("no row of dq_corrected_rallies() exceeds its limit; me_side mirrors",
   expect_equal(mirrored$rally_id, out$rally_id)
   expect_equal(mirrored$me_shots, out$me_shots)
 })
+
+# ---- per-stroke implausible-speed flag ------------------------------------
+
+test_that("one implausible stroke in an otherwise normal rally is flagged", {
+  rally <- tibble::tibble(match_id = 1L, rally_id = 1:3, regime = "net_volley", me_shots = 5L)
+  sp <- tibble::tibble(
+    match_id = 1L, rally_id = 1:3,
+    speed_kmh = c(70, 70, 70),          # every mean is plausible
+    max_speed_kmh = c(150, 161, 200)    # 160 km/h is the per-stroke limit
+  )
+  out <- dq_flag_rallies(rally, sp)
+  expect_equal(dq_params()$max_individual_stroke_speed_kmh, 160)
+  expect_true(is.na(out$flag_reason[1]))
+  expect_match(out$flag_reason[2], "individual stroke speed > 160 km/h")
+  expect_match(out$flag_reason[3], "individual stroke speed > 160 km/h")
+})
+
+test_that("the mean-speed and stroke-count reasons take precedence over the per-stroke one", {
+  rally <- tibble::tibble(match_id = 1L, rally_id = 1:2, regime = "net_volley", me_shots = c(5L, 40L))
+  sp <- tibble::tibble(match_id = 1L, rally_id = 1:2, speed_kmh = c(120, 70), max_speed_kmh = c(200, 200))
+  out <- dq_flag_rallies(rally, sp)
+  expect_match(out$flag_reason[1], "mean stroke speed")
+  expect_match(out$flag_reason[2], "strokes")
+})
+
+test_that("max_speed_kmh is optional: callers without it keep the old behaviour", {
+  rally <- tibble::tibble(match_id = 1L, rally_id = 1L, regime = "net_volley", me_shots = 5L)
+  sp <- tibble::tibble(match_id = 1L, rally_id = 1L, speed_kmh = 70)
+  expect_true(is.na(dq_flag_rallies(rally, sp)$flag_reason))
+})
+
+test_that("dq_corrected_rallies() drops a rally holding one implausible stroke", {
+  r <- mk_rally(rep(1, 9), players = c("host", "guest"), regime = "net_volley")
+  # Mean of the 5 'me' strokes is 48 mph (77 km/h); one stroke is 120 mph (193 km/h).
+  r$shots$shot_speed_mph[r$shots$player == "guest"][1] <- 120
+  expect_equal(nrow(dq_corrected_rallies(r$rally, r$shots)), 0L)
+  # Control: the same rally without the extreme stroke passes through.
+  r$shots$shot_speed_mph[] <- 30
+  expect_equal(nrow(dq_corrected_rallies(r$rally, r$shots)), 1L)
+})

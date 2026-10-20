@@ -48,7 +48,16 @@
 #' from that distribution when sessions accumulate, and do not raise it just
 #' to silence splits.
 #'
+#' `max_individual_stroke_speed_kmh` (160) flags a rally holding a single
+#' implausibly fast stroke that the mean-speed check
+#' (`max_mean_stroke_speed_kmh`) dilutes away: one 190 km/h stroke among
+#' four 50 km/h strokes averages 78 km/h and passes the mean check. It sits
+#' above any plausible recreational stroke and well below tracking
+#' artefacts; recalibrate it from the per-rally maximum speed distribution
+#' as sessions accumulate.
+#'
 #' @return A named list: `max_mean_stroke_speed_kmh` (numeric),
+#'   `max_individual_stroke_speed_kmh` (numeric),
 #'   `max_rally_strokes` (a named list with `default`, `mini_tennis`,
 #'   `forehand_cross_court` and `backhand_cross_court`; the "me" side's
 #'   strokes), `max_stroke_gap_sec` (a named list with `forehand_cross_court`,
@@ -61,6 +70,7 @@
 dq_params <- function() {
   list(
     max_mean_stroke_speed_kmh = 100,
+    max_individual_stroke_speed_kmh = 160,
     max_rally_strokes = list(
       default = 25, mini_tennis = 50,
       forehand_cross_court = 20, backhand_cross_court = 20
@@ -148,17 +158,25 @@ rally_player_strokes <- function(rallies, shot_detail, me_side = "guest", col = 
   out
 }
 
-#' Flag rallies whose stroke count or mean stroke speed exceeds threshold
+#' Flag rallies whose stroke count, mean speed, or single fastest stroke
+#' exceeds threshold
+#'
+#' The third check catches a single implausible stroke hidden inside an
+#' otherwise plausible rally, which the mean-speed check alone dilutes away
+#' (see [dq_params()]'s `max_individual_stroke_speed_kmh`). `max_speed_kmh`
+#' is an OPTIONAL column of `rally_speed_kmh`: without it the check never
+#' fires, so callers that do not supply it behave as before.
 #'
 #' @param rallies A tibble with (at least) `match_id`, `rally_id`, `regime`,
 #'   `me_shots` (see [rally_player_strokes()]; the stroke limits count the
 #'   "me" side's strokes only).
 #' @param rally_speed_kmh A tibble with (at least) `match_id`, `rally_id`,
-#'   `speed_kmh` (mean stroke speed for that rally) — see
+#'   `speed_kmh` (mean stroke speed for that rally), and OPTIONALLY
+#'   `max_speed_kmh` (that rally's single fastest stroke) — see
 #'   `scripts/make_artifact_charts.R`'s `rally_speed_per_rally`.
 #' @return `rallies` with a new `flag_reason` character column (`NA` when
-#'   not flagged; one row can carry only one reason, stroke-count checked
-#'   first).
+#'   not flagged; one row can carry only one reason, checked in this order:
+#'   stroke count, mean speed, individual stroke speed).
 #' @export
 dq_flag_rallies <- function(rallies, rally_speed_kmh) {
   if (!"me_shots" %in% names(rallies)) {
@@ -167,10 +185,17 @@ dq_flag_rallies <- function(rallies, rally_speed_kmh) {
   p <- dq_params()
   max_strokes <- rally_stroke_threshold(rallies$regime, p)
   rallies <- dplyr::left_join(rallies, rally_speed_kmh, by = c("match_id", "rally_id"))
+  max_speed_flag <- if ("max_speed_kmh" %in% names(rallies)) {
+    !is.na(rallies$max_speed_kmh) & rallies$max_speed_kmh > p$max_individual_stroke_speed_kmh
+  } else {
+    FALSE
+  }
   rallies$flag_reason <- dplyr::case_when(
     rallies$me_shots > max_strokes ~ sprintf("rally > %d strokes (drill limit)", as.integer(max_strokes)),
     !is.na(rallies$speed_kmh) & rallies$speed_kmh > p$max_mean_stroke_speed_kmh ~
       sprintf("mean stroke speed > %d km/h", p$max_mean_stroke_speed_kmh),
+    max_speed_flag ~
+      sprintf("individual stroke speed > %d km/h", as.integer(p$max_individual_stroke_speed_kmh)),
     TRUE ~ NA_character_
   )
   rallies
@@ -318,7 +343,8 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 #' 2. Rallies are flagged via [dq_flag_rallies()].
 #' 3. A rally flagged **only** for an implausible mean speed is a
 #'    corrupted-tracking problem, not a grouping problem -- it is dropped
-#'    outright.
+#'    outright. The same holds for a rally holding a single implausibly fast
+#'    stroke (`max_individual_stroke_speed_kmh`).
 #' 4. **The pause rule runs on every other rally of a pause-split regime
 #'    (cross-court and net-volley), flagged or not**: a pause strictly over
 #'    [rally_split_gap_sec()] before a rally-starter stroke is a boundary
@@ -355,7 +381,11 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
   rally_speed <- shot_detail |>
     dplyr::filter(player %in% me_side, !is.na(rally_id)) |>
     dplyr::group_by(match_id, rally_id) |>
-    dplyr::summarise(speed_kmh = mean(shot_speed_mph, na.rm = TRUE) * 1.609344, .groups = "drop")
+    dplyr::summarise(
+      speed_kmh = mean(shot_speed_mph, na.rm = TRUE) * 1.609344,
+      max_speed_kmh = if (all(is.na(shot_speed_mph))) NA_real_ else max(shot_speed_mph, na.rm = TRUE) * 1.609344,
+      .groups = "drop"
+    )
 
   rallies_flagged <- dq_flag_rallies(rallies, rally_speed)
 

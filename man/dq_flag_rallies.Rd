@@ -2,7 +2,8 @@
 % Please edit documentation in R/data_quality_params.R
 \name{dq_flag_rallies}
 \alias{dq_flag_rallies}
-\title{Flag rallies whose stroke count or mean stroke speed exceeds threshold}
+\title{Flag rallies whose stroke count, mean speed, or single fastest stroke
+exceeds threshold}
 \usage{
 dq_flag_rallies(rallies, rally_speed_kmh)
 }
@@ -12,14 +13,19 @@ dq_flag_rallies(rallies, rally_speed_kmh)
 "me" side's strokes only).}
 
 \item{rally_speed_kmh}{A tibble with (at least) \code{match_id}, \code{rally_id},
-\code{speed_kmh} (mean stroke speed for that rally) — see
+\code{speed_kmh} (mean stroke speed for that rally), and OPTIONALLY
+\code{max_speed_kmh} (that rally's single fastest stroke) — see
 \code{scripts/make_artifact_charts.R}'s \code{rally_speed_per_rally}.}
 }
 \value{
 \code{rallies} with a new \code{flag_reason} character column (\code{NA} when
-not flagged; one row can carry only one reason, stroke-count checked
-first).
+not flagged; one row can carry only one reason, checked in this order:
+stroke count, mean speed, individual stroke speed).
 }
 \description{
-Flag rallies whose stroke count or mean stroke speed exceeds threshold
+The third check catches a single implausible stroke hidden inside an
+otherwise plausible rally, which the mean-speed check alone dilutes away
+(see \code{\link[=dq_params]{dq_params()}}'s \code{max_individual_stroke_speed_kmh}). \code{max_speed_kmh}
+is an OPTIONAL column of \code{rally_speed_kmh}: without it the check never
+fires, so callers that do not supply it behave as before.
 }

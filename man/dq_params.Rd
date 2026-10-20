@@ -8,6 +8,7 @@ dq_params()
 }
 \value{
 A named list: \code{max_mean_stroke_speed_kmh} (numeric),
+\code{max_individual_stroke_speed_kmh} (numeric),
 \code{max_rally_strokes} (a named list with \code{default}, \code{mini_tennis},
 \code{forehand_cross_court} and \code{backhand_cross_court}; the "me" side's
 strokes), \code{max_stroke_gap_sec} (a named list with \code{forehand_cross_court},
@@ -66,4 +67,12 @@ and the check cannot vary with its input. Each pause threshold must lie
 inside the observed gap distribution (\code{\link[=dq_stroke_gaps]{dq_stroke_gaps()}}); re-derive it
 from that distribution when sessions accumulate, and do not raise it just
 to silence splits.
+
+\code{max_individual_stroke_speed_kmh} (160) flags a rally holding a single
+implausibly fast stroke that the mean-speed check
+(\code{max_mean_stroke_speed_kmh}) dilutes away: one 190 km/h stroke among
+four 50 km/h strokes averages 78 km/h and passes the mean check. It sits
+above any plausible recreational stroke and well below tracking
+artefacts; recalibrate it from the per-rally maximum speed distribution
+as sessions accumulate.
 }

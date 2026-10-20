@@ -52,7 +52,8 @@ For every rally, in order:
 \item Rallies are flagged via \code{\link[=dq_flag_rallies]{dq_flag_rallies()}}.
 \item A rally flagged \strong{only} for an implausible mean speed is a
 corrupted-tracking problem, not a grouping problem -- it is dropped
-outright.
+outright. The same holds for a rally holding a single implausibly fast
+stroke (\code{max_individual_stroke_speed_kmh}).
 \item \strong{The pause rule runs on every other rally of a pause-split regime
 (cross-court and net-volley), flagged or not}: a pause strictly over
 \code{\link[=rally_split_gap_sec]{rally_split_gap_sec()}} before a rally-starter stroke is a boundary
