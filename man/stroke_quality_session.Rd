@@ -12,7 +12,8 @@ stroke_quality_session(
   regimes = c("forehand_cross_court", "backhand_cross_court"),
   me_side = "guest",
   feeder_side = "host",
-  feeder_right_handed = TRUE
+  feeder_right_handed = TRUE,
+  me_right_handed = TRUE
 )
 }
 \arguments{
@@ -30,7 +31,8 @@ and \code{clearance} weights, not all zero.}
 
 \item{me_side, feeder_side}{The \code{player} values for each side.}
 
-\item{feeder_right_handed}{Passed to \code{\link[=cross_court_zone_score]{cross_court_zone_score()}}.}
+\item{feeder_right_handed, me_right_handed}{Passed to
+\code{\link[=cross_court_zone_score]{cross_court_zone_score()}}.}
 }
 \value{
 A tibble, one row per session, ordered by date: \code{session_date},
@@ -55,9 +57,11 @@ response signal; strokes without one are left out, not counted as 0).
 }
 
 Each is standardised across the sessions supplied (z-score; a component
-with no variation, or a single session, standardises to 0, never \code{NaN}),
-so the scores are relative to the history passed in, and adding a session
-changes earlier values. The composite \code{quality} is the weighted mean of the
+with no variation across two or more sessions standardises to 0, never
+\code{NaN}; a component present in fewer than two sessions has no spread to
+standardise against, so its z-score is \code{NA}, not 0), so the scores are
+relative to the history passed in, and adding a session changes earlier
+values. With one session, \code{quality} is therefore \code{NA}. The composite \code{quality} is the weighted mean of the
 standardised components that are present for that session; a missing
 component is left out and the weights renormalised, and \code{quality} is \code{NA}
 when no weighted component is present. Weights are \code{weights}, by default

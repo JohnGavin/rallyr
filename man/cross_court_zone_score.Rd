@@ -14,7 +14,8 @@ cross_court_zone_score(
   feeder_right_handed = TRUE,
   me_side = "guest",
   feeder_side = "host",
-  deep_zones = "no_mans_land"
+  deep_zones = "no_mans_land",
+  me_right_handed = TRUE
 )
 }
 \arguments{
@@ -38,6 +39,11 @@ Not verified per session; the default is \code{TRUE}.}
 feeder (\code{"guest"} / \code{"host"}, as elsewhere in the package).}
 
 \item{deep_zones}{Values of \code{bounce_location_long} that count as deep.}
+
+\item{me_right_handed}{Logical scalar: is the "me" player right-handed? The
+target widths above (\code{"deuce"} for the forehand drill, \code{"ad"} for the
+backhand drill) are for a right-hander and are swapped when \code{FALSE}.
+Default \code{TRUE}; not verified per session.}
 }
 \value{
 An ordered factor the same length as the input, \code{NA} where the

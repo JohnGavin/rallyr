@@ -10,7 +10,8 @@ stroke_quality_trend(sq, windows = c(1, 2, 4, 8))
 \item{sq}{Output of \code{\link[=stroke_quality_session]{stroke_quality_session()}} (needs \code{session_date} and
 \code{quality}).}
 
-\item{windows}{Integer window sizes, by default 1, 2, 4 and 8 sessions.}
+\item{windows}{Window sizes in sessions, by default 1, 2, 4 and 8: unique,
+finite whole numbers of at least 1 (anything else is an error).}
 }
 \value{
 A tibble, one row per session and window: \code{session_date},

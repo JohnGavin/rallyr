@@ -39,6 +39,10 @@
 #' @param me_side,feeder_side The `player` values for the "me" side and the
 #'   feeder (`"guest"` / `"host"`, as elsewhere in the package).
 #' @param deep_zones Values of `bounce_location_long` that count as deep.
+#' @param me_right_handed Logical scalar: is the "me" player right-handed? The
+#'   target widths above (`"deuce"` for the forehand drill, `"ad"` for the
+#'   backhand drill) are for a right-hander and are swapped when `FALSE`.
+#'   Default `TRUE`; not verified per session.
 #' @return An ordered factor the same length as the input, `NA` where the
 #'   stroke is not a scoreable "me" cross-court stroke or the signal needed is
 #'   missing. Levels, worst to best: `"out_of_play"`, `"off_target_width"`,
@@ -49,7 +53,8 @@ cross_court_zone_score <- function(regime, player, bounce_location_long,
                                    bounce_location_lat, next_player,
                                    next_hit_wing, feeder_right_handed = TRUE,
                                    me_side = "guest", feeder_side = "host",
-                                   deep_zones = "no_mans_land") {
+                                   deep_zones = "no_mans_land",
+                                   me_right_handed = TRUE) {
   lv <- c("out_of_play", "off_target_width", "tier_3", "tier_2", "tier_1")
   n <- max(
     length(regime), length(player), length(bounce_location_long),
@@ -67,10 +72,15 @@ cross_court_zone_score <- function(regime, player, bounce_location_long,
   scoreable <- !is.na(rg) & rg %in% c("forehand_cross_court", "backhand_cross_court") &
     !is.na(ply) & ply %in% me_side
   fh_drill <- !is.na(rg) & rg == "forehand_cross_court"
-  target_width <- ifelse(fh_drill, "deuce", "ad")
+  # Target width: deuce for a right-hander's forehand cross-court, mirrored
+  # for a left-hander.
+  fh_width <- if (isTRUE(me_right_handed)) "deuce" else "ad"
+  bh_width <- if (isTRUE(me_right_handed)) "ad" else "deuce"
+  target_width <- ifelse(fh_drill, fh_width, bh_width)
 
   known_zone <- !is.na(bl) & !is.na(bla)
-  out_of_play <- known_zone & (bl == "out" | bla %in% c("ad_out", "deuce_out"))
+  # Out on either axis alone is out of play, as in stroke_outcome_severity().
+  out_of_play <- (!is.na(bl) & bl == "out") | (!is.na(bla) & bla %in% c("ad_out", "deuce_out"))
   in_target <- known_zone & !out_of_play & bla == target_width
   deep <- !is.na(bl) & bl %in% deep_zones
 

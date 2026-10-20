@@ -107,7 +107,8 @@ rally_end_rule <- function(shot_detail, params = dq_params(), rally_starter = "h
     col("bounce_location_lat", NA_character_), col("hit_court_side", NA_character_),
     col("bounce_court_side", NA_character_)
   )
-  d <- d[order(d$match_id, d$started_at), ]
+  # Row index as the last key: equal timestamps keep their input order.
+  d <- d[order(d$match_id, d$started_at, seq_len(nrow(d))), ]
   next_t <- dplyr::lead(d$started_at)
   next_p <- dplyr::lead(d$player)
   same_match <- !is.na(dplyr::lead(d$match_id)) & dplyr::lead(d$match_id) == d$match_id

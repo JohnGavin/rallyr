@@ -120,3 +120,46 @@ test_that("trend sorts by date and rejects a missing column (#13)", {
   expect_equal(tr$baseline, c(NA, 3))
   expect_error(stroke_quality_trend(tibble::tibble(a = 1)), "quality")
 })
+
+test_that("strokes with no rally id are not paired with their neighbours (#13)", {
+  sd <- mk_q(1, speeds = c(40, 60))
+  m <- mk_matches(1, "2000-01-01")
+  paired <- stroke_quality_session(sd, m)
+  expect_equal(paired$zone_score, 1)
+  sd$rally_id <- NA
+  unpaired <- stroke_quality_session(sd, m)
+  expect_true(is.na(unpaired$zone_score))
+  expect_equal(unpaired$speed_mph, 50)
+})
+
+test_that("a component present in fewer than 2 sessions has no z-score; quality is NA (#13)", {
+  m1 <- mk_matches(1, "2000-01-01")
+  one <- stroke_quality_session(mk_q(1, 40), m1)
+  expect_true(is.na(one$z_speed))
+  expect_true(is.na(one$quality))
+  # clearance exists in one of two sessions only: its z is NA, speed still scores
+  sd <- dplyr::bind_rows(mk_q(1, 40, clearance = 0.5), mk_q(2, 60))
+  sq <- stroke_quality_session(
+    sd, mk_matches(1:2, c("2000-01-01", "2000-01-08")),
+    weights = list(speed = 1, zone = 0, clearance = 1)
+  )
+  expect_true(all(is.na(sq$z_clearance)))
+  expect_equal(sq$quality, sq$z_speed)
+  # two sessions with identical values still standardise to 0
+  same <- stroke_quality_session(
+    dplyr::bind_rows(mk_q(1, 40), mk_q(2, 40)),
+    mk_matches(1:2, c("2000-01-01", "2000-01-08"))
+  )
+  expect_equal(same$z_speed, c(0, 0))
+})
+
+test_that("trend windows must be unique finite whole numbers of at least 1 (#13)", {
+  sq <- tibble::tibble(session_date = as.Date("2000-01-01") + 0:3, quality = 1:4)
+  expect_error(stroke_quality_trend(sq, windows = 1.5), "windows")
+  expect_error(stroke_quality_trend(sq, windows = 0), "windows")
+  expect_error(stroke_quality_trend(sq, windows = Inf), "windows")
+  expect_error(stroke_quality_trend(sq, windows = c(2, 2)), "windows")
+  expect_error(stroke_quality_trend(sq, windows = "2"), "windows")
+  expect_error(stroke_quality_trend(sq, windows = numeric(0)), "windows")
+  expect_equal(unique(stroke_quality_trend(sq, windows = c(1, 2))$window), c(1L, 2L))
+})

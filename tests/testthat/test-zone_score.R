@@ -109,3 +109,26 @@ test_that("zone_score_numeric maps levels onto 0..1 (#24)", {
   expect_equal(v[3], 0)  # out of play needs no response signal
   expect_equal(zone_score_numeric(factor("out_of_play", levels = levels(x), ordered = TRUE)), 0)
 })
+
+test_that("a depth of 'out' alone is out of play even with an unknown width (#24)", {
+  out <- zs(
+    regime = "forehand_cross_court", player = "guest",
+    bounce_location_long = c("out", "no_mans_land"),
+    bounce_location_lat = c(NA, NA),
+    next_player = "host", next_hit_wing = "right"
+  )
+  expect_equal(as.character(out), c("out_of_play", NA))
+})
+
+test_that("a left-handed me side mirrors the target widths (#24)", {
+  args <- list(
+    regime = c("forehand_cross_court", "backhand_cross_court"), player = "guest",
+    bounce_location_long = "no_mans_land",
+    bounce_location_lat = c("ad", "deuce"),
+    next_player = "host", next_hit_wing = c("right", "left")
+  )
+  right <- do.call(cross_court_zone_score, args)
+  expect_equal(as.character(right), c("off_target_width", "off_target_width"))
+  left <- do.call(cross_court_zone_score, c(args, list(me_right_handed = FALSE)))
+  expect_equal(as.character(left), c("tier_1", "tier_1"))
+})

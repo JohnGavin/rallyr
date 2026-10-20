@@ -116,3 +116,15 @@ test_that("matches are ordered by time and ended separately (#12)", {
 test_that("rally_end_rule() names a missing column (#12)", {
   expect_error(rally_end_rule(tibble::tibble(match_id = 1)), "started_at")
 })
+
+test_that("equal timestamps keep input order, so the result is deterministic (#12)", {
+  sd <- mk_shots(c(0, 0, 0, 5), c("host", "guest", "host", "guest"),
+                 long = c("no_mans_land", "no_mans_land", "out", "no_mans_land"))
+  sd$tag <- c("a", "b", "c", "d")
+  out <- rally_end_rule(sd)
+  expect_equal(out$tag, c("a", "b", "c", "d"))
+  expect_equal(out$end_reason, c(NA, NA, "fault", "end_of_data"))
+  # the same rows in another order of equal-time strokes follow that order
+  rev_in <- rally_end_rule(sd[c(3, 1, 2, 4), ])
+  expect_equal(rev_in$tag, c("c", "a", "b", "d"))
+})
