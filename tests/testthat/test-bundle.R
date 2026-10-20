@@ -66,6 +66,25 @@ test_that("a file that is not JSON is an error that says so", {
   expect_error(bundle_payload_kind(p), "not valid JSON")
 })
 
+test_that("a file whose whole text is a URL or a file path is never followed", {
+  # jsonlite::fromJSON() would fetch a URL, or read a file, given as the text.
+  # A request shows as a warning from the connection (the host does not exist).
+  url_file <- withr::local_tempfile(fileext = ".json")
+  writeLines("https://x.example/y", url_file)
+  expect_no_warning(expect_error(bundle_payload_kind(url_file), "not valid JSON"))
+  expect_no_warning(expect_error(bundle_read(url_file), "not valid JSON"))
+  no_newline <- withr::local_tempfile(fileext = ".json")
+  cat("https://x.example/y", file = no_newline)
+  expect_no_warning(expect_error(bundle_read(no_newline), "not valid JSON"))
+
+  other <- withr::local_tempfile(fileext = ".json")
+  writeLines('{"schema_version": 1, "sessions": []}', other)
+  path_file <- withr::local_tempfile(fileext = ".json")
+  cat(other, file = path_file)   # no newline: the text is exactly an existing path
+  expect_error(bundle_read(path_file), "not valid JSON")
+  expect_error(bundle_payload_kind(path_file), "not valid JSON")
+})
+
 # ---- adding a session ------------------------------------------------------
 
 test_that("bundle_add_raw() takes the three files in any order and reports it", {

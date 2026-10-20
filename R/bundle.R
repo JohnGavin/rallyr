@@ -88,14 +88,18 @@ bundle_read_text <- function(path) {
   rawToChar(bytes)
 }
 
+# `jsonlite::fromJSON()` treats a string that is a URL or an existing file path
+# as something to fetch or read. The text here comes from an uploaded file, so
+# it is checked to BE JSON first (`validate()` never fetches or reads), and only
+# then parsed: text that is valid JSON is always parsed as JSON.
 bundle_parse_json <- function(text, what) {
-  tryCatch(
-    jsonlite::fromJSON(text, simplifyVector = FALSE),
-    error = function(e) {
-      detail <- conditionMessage(e)
-      cli::cli_abort(c("x" = "{what} is not valid JSON.", "i" = "{detail}"))
-    }
-  )
+  ok <- jsonlite::validate(text)
+  if (!isTRUE(ok)) {
+    detail <- attr(ok, "err")
+    if (is.null(detail)) detail <- "the text is not JSON"
+    cli::cli_abort(c("x" = "{what} is not valid JSON.", "i" = "{detail}"))
+  }
+  jsonlite::fromJSON(text, simplifyVector = FALSE)
 }
 
 # ---- payload kinds ---------------------------------------------------------
