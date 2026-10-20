@@ -23,7 +23,7 @@ character, \code{regime}, \code{regime_occurrence}, \code{segment_index}, \code{
 \code{duration_sec}, \code{start_time}, \code{end_time}) plus \code{speed_kmh}. A rally
 present in \code{rallies} can be ABSENT here — dropped, never silently
 merged into another rally's row — when it (or every one of its
-best-effort sub-rallies) is still implausible after correction. No row
+sub-rallies) is still implausible after correction. No row
 in the output exceeds its own regime's \code{max_rally_strokes} threshold.
 }
 \description{
@@ -50,8 +50,8 @@ used, now centralised here.
 stroke count) is a corrupted-tracking problem, not a
 rally-boundary/grouping problem — it is dropped outright, unchanged
 from the flag-only behaviour \code{dq_flag_rallies()} already documents.
-\item A rally flagged for stroke count gets the same two-pass split
-treatment \code{\link[=split_flagged_rallies]{split_flagged_rallies()}} proposes for human review (reusing
+\item A rally flagged for stroke count gets the same pause-based split
+\code{\link[=split_flagged_rallies]{split_flagged_rallies()}} proposes for human review (reusing
 \code{\link[=find_rally_splits]{find_rally_splits()}} directly rather than duplicating its gap-finding
 logic — see that function's own docs) — but instead of just
 \emph{reporting} proposed sub-rally sizes, each shot is actually assigned
@@ -65,12 +65,13 @@ converted to km/h). Each sub-rally gets a new, disambiguated
 therefore always returned as \strong{character}, not numeric, even for
 rallies that were never split (\code{rally_id} alone is only unique WITHIN
 a match to begin with; see \code{\link[=tennis_rallies]{tennis_rallies()}}).
-\item A rally with fewer than 2 shots (can't be split at all), or a
-sub-rally that's STILL over its own regime's stroke threshold after
-the best-effort split, is dropped — not force-resolved further, and
-not silently included. This matches \code{\link[=split_flagged_rallies]{split_flagged_rallies()}}'s
-\code{still_flagged} semantics, applied here as an actual exclusion
-instead of a flag for a human to read.
+\item The stroke limit only FLAGS; there is no forced split. A flagged rally
+with no qualifying pause (including one with fewer than 2 shots), or a
+sub-rally still over its own regime's stroke threshold after the pause
+split, is dropped -- not force-split, and not silently included. A
+valid sibling sub-rally is kept. This matches
+\code{\link[=split_flagged_rallies]{split_flagged_rallies()}}'s \code{still_flagged} semantics, applied here as
+an actual exclusion instead of a flag for a human to read.
 \item Every rally that was never flagged at all passes through unchanged,
 with \code{speed_kmh} attached.
 }
