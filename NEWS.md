@@ -24,3 +24,21 @@
   implausibly fast stroke is flagged.
 * `segment_session_shots(min_segment_duration_min = )`: a same-regime run
   shorter than 3 minutes becomes a `"gap"`.
+
+## Parsing precision and persisted fields
+
+* `sv_time()` keeps sub-second precision (`%OS`); per-stroke gaps were
+  previously rounded to whole seconds.
+* `tennis_db_upsert()` adds columns the stored table lacks (existing rows
+  get `NULL`) instead of failing; existing columns are never dropped or
+  retyped.
+* `sv_parse_shots()` and the shot table persist `hit_frame`,
+  `video_elapsed_sec`, `hit_court_side`, `bounce_court_side`,
+  `net_clearance_m`, `bounce_location_long`/`_lat`, numeric hit and bounce
+  coordinates (`hit_x`..`bounce_z`) and the raw `hit_velocity_x`/`_y`/`_z`.
+* `fmt_video_time()` and `sv_video_drift()` (PASS / DRIFT / INDETERMINATE
+  check of a recording's frame timing against the pinned rate).
+* `dq_null_sentinel()`, `dq_clean_shot_speed()` and
+  `dq_params()$sentinel_shot_speeds_mph`: placeholder speeds are set to `NA`
+  and flagged, the stroke is kept; `dq_corrected_rallies()` applies them.
+* Docs: match start time is not a stable anchor, spin is categorical only.
