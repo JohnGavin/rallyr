@@ -21,4 +21,7 @@ rally that \code{\link[=dq_corrected_rallies]{dq_corrected_rallies()}} splits in
 increases the corrected row count, so that difference can go negative
 ("-5 of 937 rallies excluded"). Compute the flagged set once with
 \code{\link[=dq_flag_rallies]{dq_flag_rallies()}} and reuse this count for every chart and audit table.
+"Excluded" means flagged, i.e. a rally the data-quality checks object to;
+it does not mean the rally is absent from \code{\link[=dq_corrected_rallies]{dq_corrected_rallies()}}, since a
+flagged rally can still contribute surviving sub-rallies after a split.
 }

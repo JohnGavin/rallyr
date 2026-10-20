@@ -20,7 +20,7 @@ quick-start example below runs with no real session data of any kind.
 ## Input
 
 - One **SwingVision share URL** (or bare token) — e.g.
-  `https://swing.vision/matches/sw2-K4mQrXz9F` — for one recorded session.
+  `https://swing.vision/matches/sw2-EXAMPLE01` — for one recorded session.
   That's the only thing you provide.
 - Everything else is derived from it: `fetch_swingvision()` pulls
   session-aggregate stats, `fetch_swingvision_shots()` pulls per-shot

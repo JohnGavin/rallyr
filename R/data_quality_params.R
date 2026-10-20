@@ -195,13 +195,16 @@ rally_split_gap_sec <- function(regime, params = dq_params()) {
 #'
 #' A rally's `n_shots` counts both players' strokes; the stroke limits count
 #' the "me" side's only. A stroke belongs to a rally when it is in the same
-#' match and its `started_at` falls between the rally's `start_time` and
-#' `end_time` (inclusive).
+#' match and carries that rally's `rally_id` (the same rule the split code
+#' uses); a stroke with an `NA` `rally_id` belongs to no rally. Only when
+#' `shot_detail` has no `rally_id` column at all does it fall back to
+#' counting strokes whose `started_at` falls between the rally's `start_time`
+#' and `end_time` (inclusive).
 #'
 #' @param rallies Rally tibble with `match_id`, `rally_id`, `start_time`,
 #'   `end_time`.
 #' @param shot_detail Per-stroke tibble with `match_id`, `player`,
-#'   `started_at`.
+#'   `started_at`, and normally `rally_id`.
 #' @param me_side Which `player` value counts as "me" (`"guest"` by default).
 #' @param col Name of the new column (`"me_shots"` by default).
 #' @return `rallies` with a new integer column `col` (0 when the player hit
@@ -217,14 +220,29 @@ rally_player_strokes <- function(rallies, shot_detail, me_side = "guest", col = 
     cli::cli_abort("{.arg shot_detail} needs {.val {need_s}}.")
   }
   rallies[[col]] <- NULL
-  strokes <- shot_detail[shot_detail$player %in% me_side, c("match_id", "started_at")]
-  keys <- rallies[, need_r]
-  counts <- dplyr::inner_join(
-    keys, strokes,
-    by = dplyr::join_by(match_id, dplyr::between(y$started_at, x$start_time, x$end_time))
-  ) |>
-    dplyr::count(.data$match_id, .data$rally_id, name = col)
-  out <- dplyr::left_join(rallies, counts, by = c("match_id", "rally_id"))
+  mine <- shot_detail[shot_detail$player %in% me_side, ]
+  if ("rally_id" %in% names(shot_detail)) {
+    # Count by rally_id, as the split code does; strokes with an NA rally_id
+    # belong to no rally.
+    counts <- mine[!is.na(mine$rally_id), c("match_id", "rally_id")] |>
+      dplyr::mutate(rally_id = as.character(.data$rally_id)) |>
+      dplyr::count(.data$match_id, .data$rally_id, name = col)
+    rallies$.rid_chr <- as.character(rallies$rally_id)
+    out <- dplyr::left_join(
+      rallies, dplyr::rename(counts, .rid_chr = "rally_id"),
+      by = c("match_id", ".rid_chr")
+    )
+    out$.rid_chr <- NULL
+  } else {
+    # Fallback only when strokes carry no rally_id: count by time window.
+    keys <- rallies[, need_r]
+    counts <- dplyr::inner_join(
+      keys, mine[, c("match_id", "started_at")],
+      by = dplyr::join_by(match_id, dplyr::between(y$started_at, x$start_time, x$end_time))
+    ) |>
+      dplyr::count(.data$match_id, .data$rally_id, name = col)
+    out <- dplyr::left_join(rallies, counts, by = c("match_id", "rally_id"))
+  }
   out[[col]] <- as.integer(dplyr::coalesce(out[[col]], 0L))
   out
 }
@@ -281,6 +299,9 @@ dq_flag_rallies <- function(rallies, rally_speed_kmh) {
 #' increases the corrected row count, so that difference can go negative
 #' ("-5 of 937 rallies excluded"). Compute the flagged set once with
 #' [dq_flag_rallies()] and reuse this count for every chart and audit table.
+#' "Excluded" means flagged, i.e. a rally the data-quality checks object to;
+#' it does not mean the rally is absent from [dq_corrected_rallies()], since a
+#' flagged rally can still contribute surviving sub-rallies after a split.
 #'
 #' @param rallies_flagged Output of [dq_flag_rallies()] (needs a
 #'   `flag_reason` column).
@@ -452,7 +473,9 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 #' 5. The stroke limit only FLAGS. There is no forced split: a rally, or a
 #'    sub-rally, still over its regime's limit (including a rally with no
 #'    qualifying pause) is left out and stays flagged. A valid sibling
-#'    sub-rally is kept.
+#'    sub-rally is kept. Because a stroke-count flag hides any speed reason,
+#'    each sub-rally is also re-checked against the mean-speed and
+#'    individual-stroke-speed limits and dropped if it fails either.
 #' 6. Every unflagged rally with no qualifying pause passes through
 #'    unchanged, with `speed_kmh` attached.
 #'
@@ -520,7 +543,8 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
           duration_sec      = as.numeric(difftime(max(sub_shots$started_at), min(sub_shots$started_at), units = "secs")),
           start_time        = min(sub_shots$started_at),
           end_time          = max(sub_shots$started_at),
-          speed_kmh         = if (nrow(sub_me) > 0L) mean(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_
+          speed_kmh         = if (nrow(sub_me) > 0L) mean(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_,
+          max_speed_kmh     = if (nrow(sub_me) > 0L && !all(is.na(sub_me$shot_speed_mph))) max(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_
         )
       })
       dplyr::bind_rows(sub_rows)
@@ -535,7 +559,14 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
     max_strokes_vec <- rally_stroke_threshold(split_result$regime, params)
     # A sub-rally still over its own regime's limit stays flagged and is left
     # out -- per-row, so a valid sibling is kept.
-    split_result <- split_result[split_result$me_shots <= max_strokes_vec, ]
+    # The same goes for the speed checks: a rally flagged for its stroke count
+    # carries only that reason, so a speed artefact is re-checked per piece.
+    ok_mean <- is.na(split_result$speed_kmh) | split_result$speed_kmh <= params$max_mean_stroke_speed_kmh
+    ok_max  <- is.na(split_result$max_speed_kmh) | split_result$max_speed_kmh <= params$max_individual_stroke_speed_kmh
+    split_result <- split_result[split_result$me_shots <= max_strokes_vec & ok_mean & ok_max, ]
+    split_result$max_speed_kmh <- NULL
+  } else if ("max_speed_kmh" %in% names(split_result)) {
+    split_result$max_speed_kmh <- NULL
   }
 
   # Unflagged and no qualifying pause: passes through unchanged. Flagged and

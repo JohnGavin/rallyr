@@ -36,8 +36,11 @@
 #'   `"gap"`. Distinct from `min_shots_per_bin`, which filters individual
 #'   bins before merging: this catches a short run of bins that each passed
 #'   the bin-level filter but together are too brief to be a real drill
-#'   instance. Default from [dq_params()]'s `min_segment_duration_min` (`3`);
-#'   pass `0` to disable.
+#'   instance. Applies equally to the final segment of a session. Adjacent
+#'   `"gap"` segments (including newly relabelled ones) are merged into one
+#'   and `segment_index` is renumbered `1..n`. Must be a single non-negative
+#'   number (`NA` or negative is an error). Default from [dq_params()]'s
+#'   `min_segment_duration_min` (`3`); pass `0` to disable.
 #' @return A tibble, one row per detected segment (contiguous bins sharing a
 #'   regime), ordered by `start_time`: `segment_index`, `regime`
 #'   (`"mini_tennis"`/`"net_volley"`/`"forehand_cross_court"`/
@@ -55,6 +58,13 @@ segment_session_shots <- function(shots,
                                    mini_tennis_speed_mph = 35,
                                    wing_dominance_threshold = 0.7,
                                    min_segment_duration_min = dq_params()$min_segment_duration_min) {
+  if (!is.numeric(min_segment_duration_min) || length(min_segment_duration_min) != 1L ||
+        is.na(min_segment_duration_min) || min_segment_duration_min < 0) {
+    cli::cli_abort(c(
+      "x" = "{.arg min_segment_duration_min} must be a single non-negative number.",
+      "i" = "Use {.val 0} to disable the filter."
+    ))
+  }
   bins <- shots |>
     dplyr::mutate(
       bin = floor(as.numeric(difftime(started_at, min(started_at), units = "mins")) / bin_minutes)
@@ -106,7 +116,9 @@ segment_session_shots <- function(shots,
 
   # A segment that is implausibly short is a mis-segmentation artefact, not a
   # real drill instance: relabel it "gap" so it no longer claims its own
-  # drill slot downstream. Segments already "gap" are left alone.
+  # drill slot downstream. Segments already "gap" are left alone. Adjacent
+  # gap rows (real or relabelled) are then merged into one and segment_index
+  # is renumbered 1..n.
   segs <- segs |>
     dplyr::mutate(
       regime = dplyr::if_else(
@@ -114,6 +126,28 @@ segment_session_shots <- function(shots,
         "gap",
         regime
       )
+    )
+  run2 <- rle(segs$regime == "gap")
+  grp <- rep(seq_along(run2$lengths), run2$lengths)
+  # Only gap runs merge; every non-gap segment keeps its own group.
+  grp <- ifelse(segs$regime == "gap", grp, grp + seq_len(nrow(segs)) / (nrow(segs) + 1))
+  segs <- segs |>
+    dplyr::mutate(.grp = grp) |>
+    dplyr::group_by(.grp) |>
+    dplyr::summarise(
+      regime        = dplyr::first(regime),
+      start_time    = min(start_time),
+      end_time      = max(end_time),
+      n_shots       = sum(n_shots),
+      n_host_shots  = sum(n_host_shots),
+      n_guest_shots = sum(n_guest_shots),
+      .groups = "drop"
+    ) |>
+    dplyr::select(-".grp") |>
+    dplyr::arrange(start_time) |>
+    dplyr::mutate(
+      segment_index = dplyr::row_number(),
+      duration_min  = round(as.numeric(difftime(end_time, start_time, units = "mins")), 1)
     )
 
   segs |>
