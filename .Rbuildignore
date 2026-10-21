@@ -1,0 +1,10 @@
+^default\.nix$
+^default\.R$
+^\.github$
+^\.claude$
+^\.Rbuildignore$
+^LICENSE\.md$
+^data-raw$
+^README\.qmd$
+^\.Rproj\.user$
+^.*\.Rproj$
