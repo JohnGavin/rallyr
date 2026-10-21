@@ -7,7 +7,9 @@ library(rix)
 
 r_pkgs <- c(
   # runtime (DESCRIPTION Imports)
-  "cli", "DBI", "dplyr", "duckdb", "httr2", "rlang", "tibble",
+  "cli", "DBI", "dplyr", "duckdb", "httr2", "jsonlite", "rlang", "tibble",
+  # DESCRIPTION Suggests (app, charts, vignette)
+  "bslib", "ggplot2", "knitr", "rmarkdown", "shiny",
   # dev / test (DESCRIPTION Suggests + tooling)
   "pkgload", "testthat", "withr", "devtools", "roxygen2", "rcmdcheck"
 ) |>
@@ -20,7 +22,8 @@ rix(
   project_path = ".",
   overwrite = TRUE,
   r_pkgs = r_pkgs,
-  system_pkgs = NULL,
+  # pandoc: rmarkdown needs it to build the vignette in R CMD check.
+  system_pkgs = "pandoc",
   ide = "none"
 )
 
