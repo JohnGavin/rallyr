@@ -1,4 +1,9 @@
 #' SwingVision public share API base URL
+#'
+#' This is the vendor's share API, which is undocumented and unofficial: it
+#' has no published contract, so its endpoints and fields can change without
+#' notice. Everything this package reads from it is parsed defensively (an
+#' absent field becomes `NA`).
 #' @keywords internal
 sv_api_base <- function() "https://api.swing.tennis/v1"
 
@@ -48,6 +53,17 @@ sv_get <- function(url) {
 #'
 #' Pure function over already-fetched JSON lists (no network) so it is unit
 #' testable against committed fixtures.
+#'
+#' **Start times are not a stable anchor.** `played_at` (and `start_time`)
+#' come from the match-level `started_at` field, which can change between
+#' fetches of the same match (by minutes in one observed case). Other
+#' candidate fields mean different things: `video_started_at` is when the
+#' recording began, `first_point_at` is when the first point was tagged, and
+#' the first tracked stroke is later again (set-up and warm-up before any
+#' stroke is captured). None is interchangeable with another, so do not use
+#' the match-level start as the anchor for "elapsed into session". Prefer a
+#' property of the recording itself: `video_elapsed_sec` from the frame
+#' number (see [sv_parse_shots()]), or the first tracked stroke's timestamp.
 #'
 #' @param match The `data` element of `/v1/matches/{token}`.
 #' @param stats The `data` element of `/v1/matches/{token}/stats`.
@@ -129,8 +145,10 @@ fetch_swingvision_shots <- function(url_or_token) {
 #'
 #' Pure function over an already-fetched JSON list (no network) so it is unit
 #' testable against committed fixtures. `spin_type` is categorical (e.g.
-#' `flat`/`topspin`/`slice`) -- there is no numeric spin-rate field in this
-#' endpoint (see rallyr#2).
+#' `flat`/`topspin`/`slice`) -- there is no numeric spin-rate field (rpm) in
+#' this endpoint, and the vendor's own spreadsheet export is categorical too,
+#' so do not look for one (see rallyr#2). A chart or metric that wants a spin
+#' rate should show that gap rather than drop the question.
 #'
 #' `shot_in` is derived from `net_type`/`bounce_location_long`/
 #' `bounce_location_lat` (see [sv_shot_in()]) -- the `/shots` payload has no
@@ -146,6 +164,17 @@ fetch_swingvision_shots <- function(url_or_token) {
 #' the match into points/rallies itself, so this does not need a time-gap
 #' heuristic. `rally_id` is unique only *within* a `match_id`, not globally
 #' -- pair with `match_id` to identify a rally.
+#'
+#' Beyond the core columns, the shot table keeps the fields later checks
+#' need, so they never require a live re-fetch (rallyr#20): `hit_frame` (the
+#' video frame number of the stroke), `hit_court_side`/`bounce_court_side`,
+#' `net_clearance_m` (see [sv_net_clearance_m()]), the categorical
+#' `bounce_location_long`/`bounce_location_lat`, numeric hit and bounce
+#' coordinates (`hit_x`/`hit_y`/`hit_z`, `bounce_x`/`bounce_y`/`bounce_z`,
+#' as supplied by the API; units are not verified) and the three raw
+#' `hit_velocity_*` components (m/s, as supplied) that `shot_speed_mph` is
+#' the magnitude of. A field absent from a shot is `NA`. Other raw fields are
+#' deliberately not persisted.
 #'
 #' @param shots The `data` element of `/v1/matches/{token}/shots` -- a list
 #'   of shot objects.
@@ -164,7 +193,17 @@ sv_parse_shots <- function(shots) {
       hit_type        = character(0),
       spin_type       = character(0),
       shot_speed_mph  = numeric(0),
-      shot_in         = logical(0)
+      shot_in         = logical(0),
+      hit_frame            = numeric(0),
+      video_elapsed_sec    = numeric(0),
+      hit_court_side       = character(0),
+      bounce_court_side    = character(0),
+      net_clearance_m      = numeric(0),
+      bounce_location_long = character(0),
+      bounce_location_lat  = character(0),
+      hit_x = numeric(0), hit_y = numeric(0), hit_z = numeric(0),
+      bounce_x = numeric(0), bounce_y = numeric(0), bounce_z = numeric(0),
+      hit_velocity_x = numeric(0), hit_velocity_y = numeric(0), hit_velocity_z = numeric(0)
     ))
   }
 
@@ -180,7 +219,23 @@ sv_parse_shots <- function(shots) {
       hit_type       = sv_chr(sh$hit_type),
       spin_type      = sv_chr(sh$spin_type),
       shot_speed_mph = sv_speed_mph(sh$hit_velocity),
-      shot_in        = sv_shot_in(sh$net_type, sh$bounce_location_long, sh$bounce_location_lat)
+      shot_in        = sv_shot_in(sh$net_type, sh$bounce_location_long, sh$bounce_location_lat),
+      hit_frame            = sv_num(sh$hit_frame),
+      video_elapsed_sec    = sv_video_elapsed_sec(sh$hit_frame),
+      hit_court_side       = sv_chr(sh$hit_court_side),
+      bounce_court_side    = sv_chr(sh$bounce_court_side),
+      net_clearance_m      = sv_net_clearance_m(sh$net_location),
+      bounce_location_long = sv_chr(sh$bounce_location_long),
+      bounce_location_lat  = sv_chr(sh$bounce_location_lat),
+      hit_x    = sv_component(sh$hit_location, 1L),
+      hit_y    = sv_component(sh$hit_location, 2L),
+      hit_z    = sv_component(sh$hit_location, 3L),
+      bounce_x = sv_component(sh$bounce_location, 1L),
+      bounce_y = sv_component(sh$bounce_location, 2L),
+      bounce_z = sv_component(sh$bounce_location, 3L),
+      hit_velocity_x = sv_component(sh$hit_velocity, 1L),
+      hit_velocity_y = sv_component(sh$hit_velocity, 2L),
+      hit_velocity_z = sv_component(sh$hit_velocity, 3L)
     )
   })
 
@@ -209,10 +264,128 @@ sv_shot_in <- function(net_type, bounce_location_long, bounce_location_lat) {
 
 # ---- small coercers --------------------------------------------------------
 
+#' Parse a SwingVision ISO-8601 timestamp, keeping sub-second precision
+#'
+#' The API returns millisecond timestamps such as `"...T10:00:00.742000Z"`.
+#' The fraction is kept (`%OS`): per-shot gaps drive rally-boundary
+#' detection, so rounding every stroke to the whole second throws away the
+#' signal being measured (rallyr#14). The fraction lives in the underlying
+#' double; set `options(digits.secs = 3)` only to *print* it.
+#'
+#' @param x A timestamp string (or character vector), or `NULL`.
+#' @return A `POSIXct` in UTC; `NA` for `NULL`.
 #' @keywords internal
 sv_time <- function(x) {
   if (is.null(x)) return(as.POSIXct(NA))
-  as.POSIXct(sub("\\.\\d+Z$", "Z", x), format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  as.POSIXct(x, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
+}
+#' Video frame rate used to turn a frame number into elapsed time
+#'
+#' **Pinned, not fitted per recording.** The value was calibrated once, from
+#' shot frame numbers against shot timestamps across a batch of recordings,
+#' where it held to a fraction of a percent for all but one. That one had a
+#' recording-hardware fault, and an earlier per-recording fit silently
+#' absorbed it into a plausible-looking but wrong rate. Fitting a fresh rate
+#' to each recording therefore hides exactly the fault worth seeing: keep
+#' this constant, and use [sv_video_drift()] to surface a recording whose
+#' timing disagrees with it. Re-derive the constant only from a batch of
+#' recordings, never from one.
+#'
+#' @return A length-1 numeric, frames per second.
+#' @keywords internal
+sv_fps <- function() 60.006
+
+#' Elapsed time since the start of the video, from a shot's `hit_frame`
+#'
+#' Frame 0 is the start of the recorded video, so `hit_frame / fps` is a time
+#' a person can type into a video player to find the stroke. It does not
+#' depend on the match-level start time, which is not stable across fetches
+#' (see [sv_parse_match()]). Video time restarts at 0 for each recording: a
+#' stroke is identified by recording plus time, never by time alone. Use
+#' [fmt_video_time()] for display.
+#'
+#' @param hit_frame Raw `hit_frame` field from one shot object (may be
+#'   `NULL`).
+#' @return A length-1 numeric (seconds), or `NA_real_` if unavailable.
+#' @keywords internal
+sv_video_elapsed_sec <- function(hit_frame) {
+  f <- sv_num(hit_frame)
+  if (is.na(f)) return(NA_real_)
+  f / sv_fps()
+}
+
+#' Check a recording's frame timing against the pinned frame rate
+#'
+#' Fits the implied frame rate from `(frame, timestamp)` pairs --
+#' `(frame_last - frame_first) / (time_last - time_first)` over the earliest
+#' and latest pair -- and compares it with [sv_fps()]. It reports a verdict
+#' and never re-fits the pinned rate. Three outcomes:
+#'
+#' * `"PASS"`: the implied rate is within `tol` (relative) of the pinned one.
+#' * `"DRIFT"`: it is not; treat the recording as a data-quality problem.
+#' * `"INDETERMINATE"`: too few usable pairs, or pairs too close in time, to
+#'   say; `reason` says why. This is not a pass.
+#'
+#' @param frame Numeric frame numbers (`hit_frame`).
+#' @param started_at `POSIXct` timestamps of the same shots, same length.
+#' @param tol Relative tolerance, default 1%.
+#' @param min_pairs Minimum usable (non-`NA`) pairs, default 2.
+#' @param min_span_sec Minimum time between the earliest and latest pair, in
+#'   seconds, default 60: over a shorter span timestamp noise swamps the fit.
+#' @return A one-row tibble: `status`, `implied_fps` (`NA` if
+#'   indeterminate), `pinned_fps`, `rel_diff` (implied vs pinned, relative),
+#'   `n_pairs`, `reason` (`NA` unless indeterminate).
+#' @export
+sv_video_drift <- function(frame, started_at, tol = 0.01, min_pairs = 2L, min_span_sec = 60) {
+  if (length(frame) != length(started_at)) {
+    cli::cli_abort(c(
+      "x" = "{.arg frame} and {.arg started_at} must have the same length.",
+      "i" = "Got {length(frame)} and {length(started_at)}."
+    ))
+  }
+  pinned <- sv_fps()
+  t <- as.numeric(started_at)
+  ok <- !is.na(frame) & !is.na(t)
+  frame <- as.numeric(frame)[ok]
+  t <- t[ok]
+  result <- function(status, implied = NA_real_, reason = NA_character_) {
+    tibble::tibble(
+      status = status, implied_fps = implied, pinned_fps = pinned,
+      rel_diff = implied / pinned - 1, n_pairs = length(t), reason = reason
+    )
+  }
+  if (length(t) < min_pairs) {
+    return(result("INDETERMINATE", reason = sprintf("%d usable pairs, need %d", length(t), min_pairs)))
+  }
+  first <- which.min(t)
+  last <- which.max(t)
+  span <- t[last] - t[first]
+  if (span < min_span_sec) {
+    return(result("INDETERMINATE", reason = sprintf("pairs span %.1f s, need %.0f s", span, min_span_sec)))
+  }
+  implied <- (frame[last] - frame[first]) / span
+  result(if (abs(implied / pinned - 1) <= tol) "PASS" else "DRIFT", implied)
+}
+
+#' Net-clearance height, in metres, from a shot's `net_location`
+#'
+#' The third element of `net_location` is the ball's height as it crosses the
+#' net plane. The value is raw and not cleaned: no plausibility threshold is
+#' applied here.
+#'
+#' @param net_location Raw `net_location` field (a list/vector, or `NULL`).
+#' @return A length-1 numeric (metres), or `NA_real_` if unavailable.
+#' @keywords internal
+sv_net_clearance_m <- function(net_location) sv_component(net_location, 3L)
+
+#' The `i`-th element of a raw numeric vector field, or `NA`
+#' @param v A list/vector field from one shot object, or `NULL`.
+#' @param i Element index.
+#' @return A length-1 numeric.
+#' @keywords internal
+sv_component <- function(v, i) {
+  if (is.null(v) || length(v) < i || is.null(v[[i]])) return(NA_real_)
+  sv_num(v[[i]])
 }
 #' @keywords internal
 sv_num <- function(x) if (is.null(x)) NA_real_ else as.numeric(x)

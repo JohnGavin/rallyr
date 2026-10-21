@@ -23,3 +23,15 @@ A one-row tibble keyed on \code{match_id}.
 Pure function over already-fetched JSON lists (no network) so it is unit
 testable against committed fixtures.
 }
+\details{
+\strong{Start times are not a stable anchor.} \code{played_at} (and \code{start_time})
+come from the match-level \code{started_at} field, which can change between
+fetches of the same match (by minutes in one observed case). Other
+candidate fields mean different things: \code{video_started_at} is when the
+recording began, \code{first_point_at} is when the first point was tagged, and
+the first tracked stroke is later again (set-up and warm-up before any
+stroke is captured). None is interchangeable with another, so do not use
+the match-level start as the anchor for "elapsed into session". Prefer a
+property of the recording itself: \code{video_elapsed_sec} from the frame
+number (see \code{\link[=sv_parse_shots]{sv_parse_shots()}}), or the first tracked stroke's timestamp.
+}

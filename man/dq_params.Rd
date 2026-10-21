@@ -10,6 +10,7 @@ dq_params()
 A named list: \code{max_mean_stroke_speed_kmh} (numeric),
 \code{max_individual_stroke_speed_kmh} (numeric),
 \code{min_segment_duration_min} (numeric),
+\code{sentinel_shot_speeds_mph} (numeric -- known placeholder speeds),
 \code{max_rally_strokes} (a named list with \code{default}, \code{mini_tennis},
 \code{forehand_cross_court} and \code{backhand_cross_court}; the "me" side's
 strokes), \code{max_stroke_gap_sec} (a named list with \code{forehand_cross_court},
@@ -82,4 +83,10 @@ as sessions accumulate.
 is a mis-segmentation artefact and is relabelled \code{"gap"}. It is distinct
 from the per-bin \code{min_shots_per_bin}, which filters single one-minute bins
 before they are merged.
+
+\code{sentinel_shot_speeds_mph} lists vendor speed readings that are a fixed
+fallback value, not a measurement: the same exact value repeated across
+unrelated shots, with a large gap to the next genuine reading. They are
+nulled (the row stays, see \code{\link[=dq_clean_shot_speed]{dq_clean_shot_speed()}}). Add a value only
+after checking for that signature -- an exact repeat plus a sharp gap.
 }

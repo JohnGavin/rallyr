@@ -62,9 +62,16 @@
 #' from the per-bin `min_shots_per_bin`, which filters single one-minute bins
 #' before they are merged.
 #'
+#' `sentinel_shot_speeds_mph` lists vendor speed readings that are a fixed
+#' fallback value, not a measurement: the same exact value repeated across
+#' unrelated shots, with a large gap to the next genuine reading. They are
+#' nulled (the row stays, see [dq_clean_shot_speed()]). Add a value only
+#' after checking for that signature -- an exact repeat plus a sharp gap.
+#'
 #' @return A named list: `max_mean_stroke_speed_kmh` (numeric),
 #'   `max_individual_stroke_speed_kmh` (numeric),
 #'   `min_segment_duration_min` (numeric),
+#'   `sentinel_shot_speeds_mph` (numeric -- known placeholder speeds),
 #'   `max_rally_strokes` (a named list with `default`, `mini_tennis`,
 #'   `forehand_cross_court` and `backhand_cross_court`; the "me" side's
 #'   strokes), `max_stroke_gap_sec` (a named list with `forehand_cross_court`,
@@ -79,6 +86,7 @@ dq_params <- function() {
     max_mean_stroke_speed_kmh = 100,
     max_individual_stroke_speed_kmh = 160,
     min_segment_duration_min = 3,
+    sentinel_shot_speeds_mph = 117.1,
     max_rally_strokes = list(
       default = 25, mini_tennis = 50,
       forehand_cross_court = 20, backhand_cross_court = 20
@@ -89,6 +97,61 @@ dq_params <- function() {
     ),
     pause_split_regimes = c("forehand_cross_court", "backhand_cross_court", "net_volley"),
     split_requires_starter_next = TRUE
+  )
+}
+
+#' Null a sentinel (fallback) sensor value without dropping the row
+#'
+#' Some vendor readings are a fixed placeholder substituted when no real
+#' measurement was made. Only the affected field is set to `NA` for the
+#' affected rows; the row itself is kept (the event happened, only one
+#' measurement of it is untrustworthy) and a logical flag column records which
+#' rows were touched, for audit. Detect candidates first: an exact value
+#' repeated across otherwise-independent rows, with a sharp gap to the next
+#' genuine value. Not every numeric field has this problem.
+#'
+#' @param df A data frame.
+#' @param field Name of the numeric column to clean.
+#' @param values Known sentinel values (may be empty).
+#' @param tol A value within `tol` of a sentinel counts as that sentinel.
+#' @param flag_col Name of the new logical column; defaults to
+#'   `paste0(field, "_sentinel")`.
+#' @return `df` with `field` nulled where it matched, and `flag_col` (`TRUE`
+#'   where nulled, never `NA`).
+#' @export
+dq_null_sentinel <- function(df, field, values, tol = 0.05, flag_col = paste0(field, "_sentinel")) {
+  if (!field %in% names(df)) {
+    cli::cli_abort(c(
+      "x" = "Column {.field {field}} not found in {.arg df}.",
+      "i" = "Available: {.val {names(df)}}."
+    ))
+  }
+  x <- df[[field]]
+  hit <- rep(FALSE, length(x))
+  for (v in values) {
+    hit <- hit | (!is.na(x) & abs(x - v) <= tol)
+  }
+  x[hit] <- NA
+  df[[field]] <- x
+  df[[flag_col]] <- hit
+  df
+}
+
+#' Null the sentinel shot speeds listed in [dq_params()]
+#'
+#' A thin wrapper over [dq_null_sentinel()] for `shot_speed_mph`, using
+#' `params$sentinel_shot_speeds_mph`. Adds a `shot_speed_sentinel` flag column.
+#' [dq_corrected_rallies()] applies it, so a placeholder speed never enters a
+#' rally's mean or maximum while its stroke still counts.
+#'
+#' @param shot_detail A tibble with `shot_speed_mph`.
+#' @param params A `dq_params()`-shaped list.
+#' @return `shot_detail` with sentinel speeds set to `NA` and the flag column.
+#' @export
+dq_clean_shot_speed <- function(shot_detail, params = dq_params()) {
+  dq_null_sentinel(
+    shot_detail, "shot_speed_mph", params$sentinel_shot_speeds_mph,
+    flag_col = "shot_speed_sentinel"
   )
 }
 
@@ -390,6 +453,8 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 #'
 #' For every rally, in order:
 #'
+#' 0. Sentinel (placeholder) shot speeds are set to `NA`
+#'    ([dq_clean_shot_speed()]); the stroke itself stays.
 #' 1. The "me" side's strokes are counted per rally (`me_shots`, see
 #'    [rally_player_strokes()]) and the per-rally mean stroke speed
 #'    (`speed_kmh`) is computed from those strokes only, in km/h.
@@ -432,6 +497,8 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 #' @export
 dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
                                  me_side = "guest", rally_starter = "host") {
+  # Placeholder speeds are nulled first (the stroke still counts).
+  shot_detail <- dq_clean_shot_speed(shot_detail, params)
   rallies <- rally_player_strokes(rallies, shot_detail, me_side)
   rally_speed <- shot_detail |>
     dplyr::filter(player %in% me_side, !is.na(rally_id)) |>

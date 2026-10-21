@@ -7,6 +7,9 @@
 sv_api_base()
 }
 \description{
-SwingVision public share API base URL
+This is the vendor's share API, which is undocumented and unofficial: it
+has no published contract, so its endpoints and fields can change without
+notice. Everything this package reads from it is parsed defensively (an
+absent field becomes \code{NA}).
 }
 \keyword{internal}

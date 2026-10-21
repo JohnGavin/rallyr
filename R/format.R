@@ -27,3 +27,24 @@ fmt_mmss <- function(minutes) {
   total_sec <- round(minutes * 60)
   ifelse(is.na(minutes), "-", sprintf("%dm %02ds", total_sec %/% 60, total_sec %% 60))
 }
+
+#' Format a video-elapsed time as "m:ss" (or "h:mm:ss" past an hour)
+#'
+#' The format a video player shows, for cross-referencing a stroke against
+#' the recording (see `video_elapsed_sec` in [sv_parse_shots()]). Rounded to
+#' the nearest second.
+#'
+#' @param sec A numeric vector of seconds since the start of the video. `NA`
+#'   becomes `"-"`.
+#' @return A character vector, e.g. `"1:05"`, `"1:02:05"`.
+#' @export
+fmt_video_time <- function(sec) {
+  total <- round(sec)
+  h <- total %/% 3600
+  m <- (total %% 3600) %/% 60
+  s <- total %% 60
+  ifelse(
+    is.na(sec), "-",
+    ifelse(h > 0, sprintf("%d:%02d:%02d", h, m, s), sprintf("%d:%02d", m, s))
+  )
+}

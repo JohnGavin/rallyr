@@ -28,3 +28,10 @@ one-to-many key (several rows sharing one \code{key} value, e.g. several
 segments per \code{match_id}) works the same way — every existing row for that
 key is deleted, then all of the new rows are appended.
 }
+\details{
+A column in \code{matches} that the stored table does not have yet is added
+first (\verb{ALTER TABLE ... ADD COLUMN}, existing rows get \code{NULL}), so a parser
+that gains a field does not break an update against an older database.
+Existing columns are never dropped or retyped; a column missing from
+\code{matches} stays in the table with \code{NULL} for the new rows.
+}
