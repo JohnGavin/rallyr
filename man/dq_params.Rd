@@ -9,7 +9,8 @@ dq_params()
 \value{
 A named list: \code{max_mean_stroke_speed_kmh} (numeric),
 \code{max_individual_stroke_speed_kmh} (numeric),
-\code{min_segment_duration_min} (numeric),
+\code{min_segment_duration_min} (numeric), \code{min_drill_gap_sec} (numeric),
+\code{min_drill_segment_shots} (numeric),
 \code{sentinel_shot_speeds_mph} (numeric -- known placeholder speeds),
 \code{max_rally_strokes} (a named list with \code{default}, \code{mini_tennis},
 \code{forehand_cross_court} and \code{backhand_cross_court}; the "me" side's
@@ -85,6 +86,12 @@ as sessions accumulate.
 is a mis-segmentation artefact and is relabelled \code{"gap"}. It is distinct
 from the per-bin \code{min_shots_per_bin}, which filters single one-minute bins
 before they are merged.
+
+\code{min_drill_gap_sec} (60) and \code{min_drill_segment_shots} (10) drive
+\code{\link[=segment_session_drills]{segment_session_drills()}}: a pause of at least that many seconds between
+two strokes is a drill transition, and a segment of fewer strokes than the
+second value is a stray and merged away. Both are starting values for one
+kind of routine; check them against your own gap distribution.
 
 \code{sentinel_shot_speeds_mph} lists vendor speed readings that are a fixed
 fallback value, not a measurement: the same exact value repeated across

@@ -27,6 +27,27 @@ First public release (version bumped for the first deployed site).
 * `segment_session_shots(min_segment_duration_min = )`: a same-regime run
   shorter than 3 minutes becomes a `"gap"`.
 
+## Segmentation and classification flags
+
+* `segment_session_drills(shots, drill_order)`: drill-first segmentation at
+  long pauses, labelled with a caller-supplied order (no default);
+  `example_drill_order` is one example routine. `dq_params()` gains
+  `min_drill_gap_sec` and `min_drill_segment_shots`.
+* `rally_pid_mismatch()`: vendor point grouping versus the derived rally
+  rule, per match and drill, ranked by disagreement.
+* `flag_net_call_contradicted()`: a separate flag for out calls followed by
+  the other side's stroke; `shot_in` is unchanged and its unreliability for
+  net contacts is documented (`?sv_shot_in`).
+* `flag_hit_type_suspect()`: the baseline player's volleys in a net-volley
+  drill, flagged and not relabelled; role-purity metrics are documented as a
+  lower bound.
+* `dq_single_stroke_rallies()`: counts single-stroke rallies (genuine versus
+  split artefact is not distinguishable yet).
+* `dq_velocity_shape_rates()`: monitor for replicated-scalar velocity
+  vectors (PRESENT / ABSENT / INDETERMINATE).
+* `?signal_independence_checklist`: check a candidate signal is independent
+  of its target before trusting a strong correlation.
+
 ## Parsing precision and persisted fields
 
 * `sv_time()` keeps sub-second precision (`%OS`); per-stroke gaps were

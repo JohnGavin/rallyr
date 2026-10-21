@@ -158,6 +158,10 @@ fetch_swingvision_shots <- function(url_or_token) {
 #' so treat `shot_in` as directionally reliable per-shot signal, not a
 #' bit-exact reproduction of the `/stats` endpoint's own count.
 #'
+#' `shot_in` is unreliable for net contacts: see the "Known unreliability"
+#' section of [sv_shot_in()], and use [flag_net_call_contradicted()] to find
+#' the out calls that continued play contradicts.
+#'
 #' `rally_id` is the payload's own `pid` field, taken as-is (not derived).
 #' Verified live against `sw2-EXAMPLE01`: sorted by `started_at`, every `pid`
 #' value forms one contiguous run of shots -- SwingVision already segments
@@ -249,6 +253,35 @@ sv_parse_shots <- function(shots) {
 #' out-of-bounds zone (`bounce_location_long == "out"`, or
 #' `bounce_location_lat` is `"ad_out"`/`"deuce_out"`). See [sv_parse_shots()]
 #' for the live validation against a known session-level accuracy figure.
+#'
+#' @section Known unreliability:
+#' Any net contact is treated as a fault, with no allowance for a legal
+#' net-cord shot that still clears the net and lands in bounds. A direct
+#' video check of one drill found that only a small minority of the events
+#' called net faults were real faults; the rest were ordinary shots that
+#' crossed the net and continued a live rally. So `shot_in == FALSE` from a
+#' net contact is a weak signal, and anything built on it (accuracy metrics,
+#' rally-ending rules, stroke scoring) inherits that.
+#'
+#' The obvious cross-check is not independent. Comparing `hit_court_side`
+#' with `bounce_court_side` looks like a way to confirm that the ball crossed,
+#' but on the same video-checked mistakes those fields agreed with the wrong
+#' call: they can share the tracking error behind the net flag. Two further
+#' candidates did not discriminate either: whether a net timing field is
+#' populated (it did not vary with the truth) and whether trajectory data
+#' around the net is populated (always present). Net-clearance height
+#' overlapped between real faults and non-faults, so it cannot be used alone.
+#'
+#' The general lesson: before using a field to correct a classifier, check
+#' that it was not derived by the same detection logic (see
+#' [signal_independence_checklist]). Two fields agreeing is not independent
+#' confirmation if they share a cause.
+#'
+#' `shot_in` is deliberately left unchanged. The only mitigation here is the
+#' separate flag [flag_net_call_contradicted()], which marks out calls that
+#' were followed by the other side hitting the ball. Collect ground-truth
+#' labels for a small sample per drill type to measure real precision and
+#' recall before relying on `shot_in` for anything downstream.
 #'
 #' @param net_type,bounce_location_long,bounce_location_lat Raw fields from
 #'   one shot object.
