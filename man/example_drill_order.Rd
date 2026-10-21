@@ -12,7 +12,7 @@ example_drill_order
 }
 \description{
 A character vector naming the drills of one particular routine, in the
-order they are practised: a slow cooperative warm-up (\code{"warm_up"}), a
+order they are practised: a slow cooperative warm-up (\code{"mini_tennis"}), a
 net-volley drill, a forehand cross-court drill, a backhand cross-court
 drill, and a second net-volley drill. It is \strong{one example}, not a default
 and not a claim about how sessions are run: \code{\link[=segment_session_drills]{segment_session_drills()}} has

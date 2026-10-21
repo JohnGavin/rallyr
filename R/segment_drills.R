@@ -1,7 +1,7 @@
 #' One example drill routine, for use as `drill_order`
 #'
 #' A character vector naming the drills of one particular routine, in the
-#' order they are practised: a slow cooperative warm-up (`"warm_up"`), a
+#' order they are practised: a slow cooperative warm-up (`"mini_tennis"`), a
 #' net-volley drill, a forehand cross-court drill, a backhand cross-court
 #' drill, and a second net-volley drill. It is **one example**, not a default
 #' and not a claim about how sessions are run: [segment_session_drills()] has
@@ -16,7 +16,7 @@
 #' example_drill_order
 #' @export
 example_drill_order <- c(
-  "warm_up", "net_volley", "forehand_cross_court",
+  "mini_tennis", "net_volley", "forehand_cross_court",
   "backhand_cross_court", "net_volley"
 )
 

@@ -16,7 +16,6 @@ test_that("example_drill_order is a documented character constant", {
 })
 
 test_that("every example_drill_order value is a regime the package knows", {
-  skip("pending owner decision: warm-up regime name")
   p <- dq_params()
   known <- unique(c(
     setdiff(names(p$max_rally_strokes), "default"),
