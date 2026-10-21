@@ -404,7 +404,8 @@ sv_video_drift <- function(frame, started_at, tol = 0.01, min_pairs = 2L, min_sp
 #'
 #' The third element of `net_location` is the ball's height as it crosses the
 #' net plane. The value is raw and not cleaned: no plausibility threshold is
-#' applied here.
+#' applied here (see [dq_clean_net_clearance()]). The vendor does not state
+#' whether it is above the ground or above the net tape.
 #'
 #' @param net_location Raw `net_location` field (a list/vector, or `NULL`).
 #' @return A length-1 numeric (metres), or `NA_real_` if unavailable.

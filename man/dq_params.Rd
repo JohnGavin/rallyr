@@ -19,7 +19,9 @@ strokes), \code{max_stroke_gap_sec} (a named list with \code{forehand_cross_cour
 \code{\link[=rally_split_gap_sec]{rally_split_gap_sec()}}), \code{pause_split_regimes} (character -- the
 regimes the pause rule splits), and \code{split_requires_starter_next}
 (logical -- a pause only splits a rally when the stroke after it is the
-rally starter's).
+rally starter's), and \code{min_net_clearance_m} / \code{max_net_clearance_m}
+(numeric -- the plausible net-clearance range in metres), and
+\code{stroke_quality_weights} (a named list: \code{speed}, \code{zone}, \code{clearance}).
 }
 \description{
 Centralises every magic-number threshold used to flag implausible rows
@@ -96,4 +98,18 @@ fallback value, not a measurement: the same exact value repeated across
 unrelated shots, with a large gap to the next genuine reading. They are
 nulled (the row stays, see \code{\link[=dq_clean_shot_speed]{dq_clean_shot_speed()}}). Add a value only
 after checking for that signature -- an exact repeat plus a sharp gap.
+
+\code{min_net_clearance_m} (-1) and \code{max_net_clearance_m} (5) bound the plausible
+net-clearance height in metres (\code{\link[=dq_clean_net_clearance]{dq_clean_net_clearance()}}). A value
+outside the range is set to \code{NA} and flagged, the stroke stays. The bounds
+are deliberately loose and provisional: the vendor does not state whether
+the height is above the ground or above the net tape, so they only catch
+values that cannot be a height at all. Recalibrate them from the observed
+distribution, not to hide values.
+
+\code{stroke_quality_weights} are the weights of the stroke-quality composite
+(\code{\link[=stroke_quality_session]{stroke_quality_session()}}): \code{speed} 1, \code{zone} 1, \code{clearance} 0. Clearance
+is reported but not scored by default because more is not simply better (a
+very high ball is a lob, a very low one a net risk) and the height
+reference is unstated; give it a weight only once that is settled.
 }

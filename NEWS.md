@@ -63,3 +63,26 @@
   `dq_params()$sentinel_shot_speeds_mph`: placeholder speeds are set to `NA`
   and flagged, the stroke is kept; `dq_corrected_rallies()` applies them.
 * Docs: match start time is not a stable anchor, spin is categorical only.
+
+## Scoring, metrics and a stable derived-data interface
+
+* `cross_court_zone_score()` and `zone_score_numeric()`: landing-zone score
+  for the cross-court drills, using the feeder's actual next wing as the
+  response signal (`NA` when there is none).
+* `dq_clean_net_clearance()` and `session_net_clearance_by_drill()`: net
+  clearance with implausible values nulled and flagged (new
+  `dq_params()$min_net_clearance_m` / `max_net_clearance_m`), and a median per
+  session and drill, me versus feeder. The vendor does not say whether the
+  height is above the ground or above the net tape.
+* `stroke_outcome_severity()` and `rally_end_rule()`: ordered outcome and a
+  fault-or-pause rally boundary. Net faults need a reliable net-contact call
+  (rallyr#26) and are not produced without one.
+* `stroke_quality_session()` and `stroke_quality_trend()`: standardised
+  speed, zone and clearance composite (`dq_params()$stroke_quality_weights`,
+  clearance weight 0) and a trend against the previous 1, 2, 4 and 8 sessions.
+* `rallyr_sessions()`, `rallyr_corrected_rallies()`, `rallyr_session_metrics()`,
+  `rallyr_net_clearance()`, `rallyr_stroke_quality()`, `rallyr_api_schema()`
+  and `rallyr_schema_version()`: a documented interface for derived data with
+  a stability policy (`?"rallyr-api"`) that applies from 0.1.0, the first
+  public release. A result with a retyped, extra or missing column is an
+  error, and a test pins the schema to `rallyr_schema_version()`.
