@@ -49,7 +49,7 @@ test_that("rally_split_gap_sec() is per regime and NA where no pause split appli
 test_that("dq_params() carries the neutral starter-rule parameter", {
   p <- dq_params()
   expect_true(p$split_requires_starter_next)
-  expect_named(p, c("max_mean_stroke_speed_kmh", "max_individual_stroke_speed_kmh", "min_segment_duration_min",
+  expect_named(p, c("max_mean_stroke_speed_kmh", "max_individual_stroke_speed_kmh", "min_segment_duration_min", "min_drill_gap_sec", "min_drill_segment_shots",
                     "max_rally_strokes", "max_stroke_gap_sec", "pause_split_regimes", "sentinel_shot_speeds_mph",
                     "split_requires_starter_next",
                     "min_net_clearance_m", "max_net_clearance_m", "stroke_quality_weights"),
