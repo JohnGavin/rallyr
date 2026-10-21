@@ -15,6 +15,7 @@ A length-1 numeric (metres), or \code{NA_real_} if unavailable.
 \description{
 The third element of \code{net_location} is the ball's height as it crosses the
 net plane. The value is raw and not cleaned: no plausibility threshold is
-applied here.
+applied here (see \code{\link[=dq_clean_net_clearance]{dq_clean_net_clearance()}}). The vendor does not state
+whether it is above the ground or above the net tape.
 }
 \keyword{internal}
