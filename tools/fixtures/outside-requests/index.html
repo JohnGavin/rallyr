@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Positive control for tools/check_app_requests.mjs</title>
+</head>
+<body>
+<!--
+  A test page that deliberately makes three requests to other origins: from the
+  page, from a dedicated worker and from a service worker. The names end in
+  .invalid, which never resolves, so nothing leaves the machine. CI runs the
+  browser check on this folder with --fixture and requires exit status 1 and
+  all three origins in its output. Never part of the site.
+-->
+<p>Request fixture.</p>
+<script>
+fetch("http://outside-page.invalid/from-page").catch(function () {});
+new Worker("worker.js");
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+</script>
+</body>
+</html>

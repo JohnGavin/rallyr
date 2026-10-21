@@ -1,0 +1,151 @@
+---
+title: "Charts from the synthetic sample"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Charts from the synthetic sample}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  fig.width = 7, fig.height = 4.2, dpi = 110,
+  dev.args = list(bg = "transparent")
+)
+```
+
+This page runs rallyr on its bundled **synthetic** sample, so every number
+below is random by construction: patterns in these charts are not findings.
+It shows what the package computes and how the charts read. The same charts
+appear in the [browser app](../app/), where you can load your own sessions.
+
+```{r load, message = FALSE}
+library(rallyr)
+```
+
+## The data
+
+- The sample is a *bundle*: one file of raw API-shaped payloads, six
+  sessions (`?"rallyr-bundle"`).
+- Players are called "Sample Player" and "Sample Opponent"; dates are in 2030.
+- No real session is in the package.
+
+```{r bundle}
+path <- system.file("extdata", "synthetic_sample_bundle.json.gz", package = "rallyr")
+bundle <- bundle_read(path)
+bundle
+bundle_players(bundle)
+```
+
+`bundle_to_tables()` parses each session with the same parsers and rules the
+package applies to a live fetch, for the player you name.
+`bundle_derived()` then builds the documented derived-data tables
+(`?"rallyr-api"`). Nothing here needs a database.
+
+```{r derive}
+tables <- bundle_to_tables(bundle, me = "Sample Player")
+derived <- bundle_derived(tables)
+knitr::kable(
+  head(derived$sessions[, c("session_date", "me_shots", "shots_in_pct", "fh_speed_mph", "bh_speed_mph")], 6),
+  col.names = c("Session", "Strokes", "Accuracy (%)", "Forehand mph", "Backhand mph")
+)
+```
+
+## Session trends
+
+```{r trend, fig.alt = "Three small line charts over six sessions: stroke accuracy, stroke rate and stroke speed."}
+plot_session_trend(derived)
+```
+
+- One point per session (same-day recordings are merged into one session).
+- Each metric is a rate or a percentage, so a long session does not score
+  higher just for being long.
+- In the app a range slider limits this chart; it starts on the last three
+  months.
+
+## Rally length by drill
+
+```{r rally, fig.alt = "Dots for each rally's number of shots in each drill, with a diamond at the median."}
+plot_rally_length(derived)
+```
+
+- Rallies are the corrected ones: placeholder speeds removed, merged rallies
+  split at long pauses, implausible rallies left out (`?dq_corrected_rallies`).
+- The drill comes from `segment_session_shots()`, whose defaults describe one
+  drill routine (a short-court warm-up, net volleys, cross-court rallies);
+  recalibrate it for other routines.
+
+## Stroke speed
+
+```{r speed, fig.alt = "Box plots of your stroke speed in miles per hour for each drill."}
+plot_stroke_speed(derived)
+```
+
+- Your strokes only, in each drill.
+- Fixed placeholder speeds from the vendor are set to missing first
+  (`dq_clean_shot_speed()`), so they do not pull a drill's median.
+
+## Net clearance
+
+```{r net, fig.alt = "Points for the median net clearance in metres per session and drill, one colour for you and one for the feeder."}
+plot_net_clearance(derived)
+```
+
+- Median per session and drill, you against the feeder.
+- The vendor does not say whether the height is above the ground or above the
+  net tape, so compare you with the feeder, not with a rule.
+
+## Pauses between strokes
+
+```{r gaps, fig.alt = "Histogram of the seconds between consecutive strokes of a rally, with dashed lines at the two pause thresholds."}
+plot_gap_distribution(derived)
+```
+
+- A rally is split where the pause is longer than the dashed line for its
+  drill and the feeder hits next (`dq_params()`).
+- A threshold must sit inside the pauses actually seen. One above every
+  observed pause could never split anything, and the check would pass
+  without checking.
+
+## Use your own sessions
+
+In R, save the raw payloads of a shared session, add them to a bundle and
+write it:
+
+```{r own, eval = FALSE}
+files <- sv_download_raw("<your share link>", "raw")
+bundle <- bundle_add_raw(bundle_new(), files[["match"]], files[["stats"]], files[["shots"]])
+bundle_write(bundle, "my_sessions.json.gz")
+```
+
+Merging a newer fetch of the same session replaces the older copy
+(`bundle_merge()`), and `bundle_to_tables()` accepts either player as "me".
+
+In the browser app you can do the same without R:
+
+- load your bundle (step 1);
+- paste the share link and open the three links it shows, saving each as a
+  JSON file (the vendor's server does not let a web page read them
+  directly), then drop the files (step 2);
+- enter your name (step 3), add the session, and download the updated
+  bundle (step 4).
+
+## Privacy
+
+- Everything in the app runs in your browser; files you choose are not
+  uploaded.
+- The app makes no requests to other sites: no analytics, no proxy, no
+  fonts or scripts from elsewhere. A build check scans the code we ship and a
+  browser check lists every request the loaded app makes.
+- The page carries a Content-Security-Policy `<meta>` tag, but that tag does
+  not bind the Shinylive frame or the workers, so it is a second line, not
+  the guarantee. The guarantee is the browser check: it loads the built site
+  in a real browser that can reach no other site, uses the app (an upload and
+  a merge), and fails on any request that leaves, workers and the service
+  worker included.
+- A bundle holds raw session data. Keep it private.
+
+```{r info, echo = FALSE}
+sessionInfo()
+```

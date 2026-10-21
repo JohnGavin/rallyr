@@ -1,0 +1,7 @@
+.Rproj.user
+.Rhistory
+.RData
+_site/
+_app_build/
+docs/
+node_modules/

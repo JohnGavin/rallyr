@@ -8,3 +8,9 @@
 ^README\.qmd$
 ^\.Rproj\.user$
 ^.*\.Rproj$
+^_pkgdown\.yml$
+^_site$
+^_app_build$
+^docs$
+^tools$
+^\.gitignore$

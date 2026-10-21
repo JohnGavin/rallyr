@@ -1,4 +1,6 @@
-# rallyr 0.0.0.9000
+# rallyr 0.1.0
+
+First public release (version bumped for the first deployed site).
 
 ## Breaking changes
 
@@ -86,3 +88,31 @@
   a stability policy (`?"rallyr-api"`) that applies from 0.1.0, the first
   public release. A result with a retyped, extra or missing column is an
   error, and a test pins the schema to `rallyr_schema_version()`.
+
+## Public site, bundles and a browser app
+
+* A pkgdown site and a vignette ("Charts from the synthetic sample") built on
+  the synthetic sample; a GitHub Actions workflow builds the site and deploys
+  it to Pages from `main`.
+* An app at `/app/` (Shinylive: R running in the browser) to load a bundle of
+  past sessions, add the latest session from the three saved API payloads,
+  merge by `match_id` with a report, download the updated bundle and see the
+  charts. Files stay in the browser; the build checks that the shipped code
+  makes no request to another site.
+* Bundles: `bundle_new()`, `bundle_read()`, `bundle_write()`,
+  `bundle_payload_kind()`, `bundle_add_raw()`, `bundle_merge()`,
+  `bundle_players()`, `bundle_to_tables()`, `bundle_derived()` and
+  `bundle_schema_version()` (file format version 1). They need no database.
+* `sv_download_raw()` saves the three raw payloads of a shared session.
+* Charts: `plot_session_trend()`, `plot_rally_length()`,
+  `plot_stroke_speed()`, `plot_net_clearance()` and `plot_gap_distribution()`
+  (ggplot2, suggested).
+* New dependency: jsonlite. Suggested: ggplot2, shiny, bslib, knitr, rmarkdown.
+* Bundle files are checked more strictly: text that is a URL or a file path is
+  never followed; `fetched_at` must be an ISO-8601 date-time and is compared
+  as an instant (offsets and fractions accepted); a session's `match_id` must
+  equal its match payload id and its shots' ids; a file over 50 MB, or that
+  expands past 50 MB (`options(rallyr.bundle_max_bytes)`), is refused. On a
+  merge, a replaced or unchanged session keeps the incoming `token`, else the
+  existing one. `sv_download_raw()` has a timeout, checks each response is
+  JSON before writing, and leaves the token and URL out of error messages.
