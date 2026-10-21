@@ -4,7 +4,7 @@
 \alias{find_rally_splits}
 \title{Find within-rally split points from stroke timing gaps}
 \usage{
-find_rally_splits(started_at, ended_at = NULL, max_gap_sec)
+find_rally_splits(started_at, ended_at = NULL, max_gap_sec, is_starter = NULL)
 }
 \arguments{
 \item{started_at}{Ordered (ascending) vector of stroke start timestamps
@@ -24,23 +24,30 @@ not required for it to work against the current schema.}
 \item{max_gap_sec}{Numeric threshold in seconds. A gap strictly greater
 than this is treated as a likely rally boundary. Not derived by this
 function — pass the project's calibrated threshold (see
-issue #5).}
+\code{\link[=dq_params]{dq_params()}}).}
+
+\item{is_starter}{Optional logical vector, same length as \code{started_at}:
+\code{TRUE} where the stroke belongs to the rally starter (the feeder). When
+supplied, a gap only counts as a boundary if the stroke AFTER it is the
+starter's (the starter begins every rally, so a long pause before the
+other player's stroke is a missed stroke, not a new rally). \code{NULL}
+(default): the pause alone decides.}
 }
 \value{
 Integer vector of split-point indices \code{i}, each satisfying
 \verb{1 <= i < length(started_at)}, meaning "a split occurs between stroke
 \code{i} and stroke \code{i + 1}". A rally with \code{k} qualifying gaps splits into
 \code{k + 1} sub-rallies. Empty (\code{integer(0)}) when no gap exceeds the
-threshold, or when fewer than 2 strokes are supplied.
+threshold (or none is followed by a starter stroke, when \code{is_starter}
+is supplied), or when fewer than 2 strokes are supplied.
 }
 \description{
 A rally's shots are grouped by the SwingVision API's own \code{pid} field,
-taken as-is with no time-gap heuristic (see issue #3). This can
+taken as-is with no time-gap heuristic. This can
 silently merge two or more real rallies into one \code{pid} run when play
 actually stopped and restarted between them, producing an implausible
-stroke count for a single continuous point (see issue #5, point 4:
-"the actual re-grouping/splitting algorithm for a flagged over-long
-rally... Not yet solved").
+stroke count for a single continuous point; the pause rule in \code{\link[=dq_params]{dq_params()}} is the
+calibrated response.
 }
 \details{
 This is a \strong{pure, dependency-free} function: given ordered per-stroke

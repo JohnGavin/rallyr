@@ -112,9 +112,8 @@ sv_parse_match <- function(match, stats, me, token = NA_character_) {
 #'
 #' GETs the undocumented `/v1/matches/{token}/shots` endpoint -- a separate
 #' endpoint from [fetch_swingvision()] (session-aggregate). Same public
-#' share-token auth model, confirmed live. See issue #1 and #3 for how
-#' this was found and what it unblocks (per-shot timestamps + hit_type let a
-#' session be segmented into its drill parts).
+#' share-token auth model, confirmed live. Per-shot timestamps and hit_type let a
+#' session be segmented into its drill parts.
 #'
 #' @param url_or_token A share URL or bare token (see [sv_token()]).
 #' @return A tibble, one row per shot (see [sv_parse_shots()] for columns).
@@ -131,7 +130,7 @@ fetch_swingvision_shots <- function(url_or_token) {
 #' Pure function over an already-fetched JSON list (no network) so it is unit
 #' testable against committed fixtures. `spin_type` is categorical (e.g.
 #' `flat`/`topspin`/`slice`) -- there is no numeric spin-rate field in this
-#' endpoint (see issue #1).
+#' endpoint (see rallyr#2).
 #'
 #' `shot_in` is derived from `net_type`/`bounce_location_long`/
 #' `bounce_location_lat` (see [sv_shot_in()]) -- the `/shots` payload has no

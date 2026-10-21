@@ -11,9 +11,9 @@ weather_api_base <- function() "https://archive-api.open-meteo.com/v1/archive"
 #' [sv_parse_match()]; this looks up the ambient weather at that location on
 #' that date. Fetched for every session regardless of indoor/outdoor — wind
 #' is only meaningful outdoors, but temperature is a reasonable proxy for
-#' ambient/exertion conditions either way (issue #3's fatigue
-#' investigation: is the 1st-vs-2nd net-volley rally-length drop actually a
-#' temperature confound?).
+#' ambient/exertion conditions either way (for example, to check whether a
+#' rally-length drop between two net-volley blocks is a temperature
+#' confound).
 #'
 #' @param lat,lon Session location (`matches$latitude`/`longitude`).
 #' @param date A `Date` (or "YYYY-MM-DD" string) — `matches$session_date`.

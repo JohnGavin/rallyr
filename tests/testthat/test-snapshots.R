@@ -47,7 +47,7 @@ test_that("find_rally_splits() on real shot timing is stable", {
     shot_detail$rally_id == shot_detail$rally_id[1], ]
   one_rally <- one_rally[order(one_rally$started_at), ]
   skip_if(nrow(one_rally) < 2L, "sample rally too short to test a split")
-  splits <- find_rally_splits(one_rally$started_at, max_gap_sec = dq_params()$max_stroke_gap_sec)
+  splits <- find_rally_splits(one_rally$started_at, max_gap_sec = rally_split_gap_sec("forehand_cross_court"))
   expect_snapshot(splits)
 })
 

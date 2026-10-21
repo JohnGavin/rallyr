@@ -11,7 +11,8 @@ segment_session_shots(
   min_shots_per_bin = 4,
   volley_share_threshold = 0.4,
   mini_tennis_speed_mph = 35,
-  wing_dominance_threshold = 0.7
+  wing_dominance_threshold = 0.7,
+  min_segment_duration_min = dq_params()$min_segment_duration_min
 )
 }
 \arguments{
@@ -37,6 +38,18 @@ a (non-volley) bin is \code{"mini_tennis"}. Default \code{35}.}
 \item{wing_dominance_threshold}{Guest ground-stroke right-wing share
 at/above (or at/below \code{1 - threshold}) which a bin is a cross-court
 phase. Default \code{0.7}.}
+
+\item{min_segment_duration_min}{Minimum duration, in minutes, for a
+contiguous same-regime SEGMENT (after bins are merged) to keep its
+detected regime; a shorter segment (not already \code{"gap"}) is relabelled
+\code{"gap"}. Distinct from \code{min_shots_per_bin}, which filters individual
+bins before merging: this catches a short run of bins that each passed
+the bin-level filter but together are too brief to be a real drill
+instance. Applies equally to the final segment of a session. Adjacent
+\code{"gap"} segments (including newly relabelled ones) are merged into one
+and \code{segment_index} is renumbered \verb{1..n}. Must be a single non-negative
+number (\code{NA} or negative is an error). Default from \code{\link[=dq_params]{dq_params()}}'s
+\code{min_segment_duration_min} (\code{3}); pass \code{0} to disable.}
 }
 \value{
 A tibble, one row per detected segment (contiguous bins sharing a
@@ -45,8 +58,8 @@ regime), ordered by \code{start_time}: \code{segment_index}, \code{regime}
 \code{"backhand_cross_court"}/\code{"mixed"}/\code{"gap"}), \code{start_time}, \code{end_time},
 \code{duration_min}, \code{n_shots}, \code{n_host_shots}, \code{n_guest_shots}. \code{"gap"} rows
 are real breaks in play (a real segment boundary can fragment into
-segment/gap/segment) -- callers should treat \code{"gap"} as filler, not a
-drill phase.
+segment/gap/segment) or an implausibly short same-regime segment --
+callers should treat \code{"gap"} as filler, not a drill phase.
 }
 \description{
 Detects drill phases from three independent per-shot signals -- host's

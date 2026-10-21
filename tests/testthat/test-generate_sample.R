@@ -72,7 +72,8 @@ test_that("synthetic rallies pass dq_flag_rallies() without erroring", {
     dplyr::group_by(match_id, rally_id) |>
     dplyr::summarise(speed_kmh = mean(shot_speed_mph, na.rm = TRUE) * 1.609344, .groups = "drop")
 
-  flagged <- dq_flag_rallies(data$rallies, rally_speed_kmh)
+  rallies <- rally_player_strokes(data$rallies, data$shot_detail)
+  flagged <- dq_flag_rallies(rallies, rally_speed_kmh)
   expect_true("flag_reason" %in% names(flagged))
   expect_equal(nrow(flagged), nrow(data$rallies))
 })

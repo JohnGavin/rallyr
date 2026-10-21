@@ -4,110 +4,254 @@
 #' (a mean rally stroke speed that's too fast to be real, a rally with too
 #' many strokes to plausibly be one continuous point) so they live in one
 #' place instead of scattered across chart-generation code, and so they can
-#' be recalibrated deliberately as more sessions accumulate. See
-#' issue #5.
+#' be recalibrated deliberately as more sessions accumulate.
 #'
-#' `max_rally_strokes` is a *named list*, not a single number: `mini_tennis`
-#' is a deliberately slow, cooperative warm-up phase where a long
-#' continuous rally is genuinely plausible (see issue #3/#4's review of
-#' the 14 rallies already found above the *original* default-regime
-#' threshold of 50 strokes — 12 of 14 were `mini_tennis`), so it gets its
-#' own, higher threshold. Every other regime uses `default`.
+#' **Stroke limits are per drill and count one player's strokes.**
+#' `max_rally_strokes` is a *named list* keyed by regime; the limit applies
+#' to the strokes of the player whose practice is being analysed (the "me"
+#' side, see [rally_player_strokes()]), not to both players together.
+#' `mini_tennis` is a deliberately slow, cooperative warm-up where a long
+#' continuous rally is plausible, so it gets the highest limit (50). The
+#' single-wing cross-court drills (`forehand_cross_court`,
+#' `backhand_cross_court`) get the lowest (20). Every other regime
+#' (`net_volley`, and anything not listed) uses `default` (25). Looked up via
+#' [rally_stroke_threshold()].
 #'
-#' **Tightened 2026-09-01 (issue #14 and #28 reopened #14 again): 50/60
-#' -> 40/50.** The original 50/60 pair was set from the *first* pass at
-#' `split_flagged_rallies()` (its gap-threshold pass only), which at the
-#' time found no qualifying gap in the data and so never actually resolved
-#' any of those 14 rallies — the thresholds were, in effect, calibrated
-#' against unsplit, still-implausible rallies, not against genuinely
-#' plausible upper bounds for one continuous point. The user directly
-#' reported extreme outliers still coming through into the "Rally length
-#' distribution, by session and drill" chart under the old thresholds
-#' (>100 strokes for `mini_tennis`, >50 for the other drills) and asked for
-#' tighter values (`mini_tennis` 50, other drills 40) — this docstring no
-#' longer claims those numbers are independently re-derived from a fresh
-#' empirical review (no such review has been re-run since the 2026-08-31
-#' one that produced 50/60); they are the user-specified tightened bound,
-#' recorded here so the next recalibration starts from a stated number
-#' rather than a silently stale one. What DID change materially since
-#' 50/60 was set: [dq_corrected_rallies()] (added alongside this
-#' tightening) now actually applies `split_flagged_rallies()`'s two-pass
-#' split logic to every chart's input data, not just to the Exceptions
-#' page's proposal table — so a rally that would have silently stayed
-#' above the old, looser thresholds is now either split into plausible
-#' sub-rallies or dropped, before any chart ever sees it.
+#' These are FLAGS, not corrections -- a flagged row is surfaced for review,
+#' never silently dropped, altered, or excluded from the underlying database
+#' tables. Only chart-level *display* filtering (with an explicit note of how
+#' many rows were excluded and why, see [dq_excluded_count()]) may skip a
+#' flagged row.
 #'
-#' These are FLAGS, not corrections — a flagged row is surfaced for human
-#' review (see the artifact's Exceptions page), never silently dropped,
-#' altered, or excluded from the underlying `tennis.duckdb` tables. Only
-#' chart-level *display* filtering (with an explicit on-chart note of how
-#' many rows were excluded and why) may skip a flagged row.
+#' **The stroke limit only flags; it never splits.** The pause rule runs on
+#' every rally of a pause-split regime, whether or not the rally is over its
+#' limit; a rally or sub-rally still over its limit afterwards is flagged and
+#' left out of [dq_corrected_rallies()], never force-split.
 #'
-#' `max_stroke_gap_sec` (issue #14, corrected #42) is the threshold
-#' [find_rally_splits()] uses to propose a split of an over-long,
-#' `pid`-grouped rally at a pause independently plausible as a real break in
-#' play.
+#' `max_stroke_gap_sec` is the pause, in seconds, that [find_rally_splits()]
+#' treats as a rally boundary. It is a *named list*, one entry per regime in
+#' `pause_split_regimes` (cross-court drills 3 s, net-volley 2 s; mini-tennis
+#' is never pause-split), looked up via [rally_split_gap_sec()]. A gap must be
+#' strictly greater than the threshold to split. There is no `default`.
 #'
-#' **A threshold above the observed maximum is not a threshold.** It was set
-#' to 8s on the reasoning that the largest gap actually seen was 5s, so 8
-#' sat "comfortably above" it. That made the gap pass structurally incapable
-#' of ever firing: measured across the current `shot_detail`, 9,666
-#' within-rally gaps run 1s (median) / 4s (p99) / 5s (max), with **zero** at
-#' or above 6s. Every rally therefore fell through to the forced pass, and
-#' `split_method == "gap_threshold"` could never appear in any output. A
-#' check whose result cannot vary with its input is not a check
-#' (`checks-must-distinguish-unknown`).
+#' `split_requires_starter_next` (logical): a pause only counts as a rally
+#' boundary when the stroke after it is the rally starter's (the feeder, the
+#' `"host"` side by default; see the `rally_starter` argument of
+#' [dq_corrected_rallies()]), because the feeder starts every rally; a long
+#' gap before the other player's stroke is a missed stroke, not a new rally.
+#' Set `FALSE` to let the pause alone decide.
 #'
-#' Set to **4s**, inside the observed range: 176 of 9,666 gaps (1.8%) reach
-#' it. The domain reasoning is the user's and is the right kind: during
-#' cooperative drills a pause of more than about 3-4 seconds is far more
-#' likely to be a new rally starting than a continuing point. Timestamps
-#' have 1-second resolution, so gaps are integers and this must stay an
-#' integer to mean what it says.
+#' **A threshold above the observed maximum is not a threshold.** If it sits
+#' above every within-rally gap actually seen, the pause rule can never fire
+#' and the check cannot vary with its input. Each pause threshold must lie
+#' inside the observed gap distribution ([dq_stroke_gaps()]); re-derive it
+#' from that distribution when sessions accumulate, and do not raise it just
+#' to silence splits.
 #'
-#' **Constraint for any future recalibration:** the value must lie inside
-#' the observed gap distribution (`dq_stroke_gaps()`), and setting it above
-#' the observed maximum is a defect, not a conservative choice. Re-derive it
-#' from the distribution when sessions accumulate; do not raise it to
-#' silence splits.
+#' `max_individual_stroke_speed_kmh` (160) flags a rally holding a single
+#' implausibly fast stroke that the mean-speed check
+#' (`max_mean_stroke_speed_kmh`) dilutes away: one 190 km/h stroke among
+#' four 50 km/h strokes averages 78 km/h and passes the mean check. It sits
+#' above any plausible recreational stroke and well below tracking
+#' artefacts; recalibrate it from the per-rally maximum speed distribution
+#' as sessions accumulate.
+#'
+#' `min_segment_duration_min` (3) is the shortest same-regime run of bins
+#' [segment_session_shots()] accepts as a real drill instance; a shorter run
+#' is a mis-segmentation artefact and is relabelled `"gap"`. It is distinct
+#' from the per-bin `min_shots_per_bin`, which filters single one-minute bins
+#' before they are merged.
 #'
 #' @return A named list: `max_mean_stroke_speed_kmh` (numeric),
-#'   `max_rally_strokes` (a named list with `default` and `mini_tennis`),
-#'   and `max_stroke_gap_sec` (numeric).
+#'   `max_individual_stroke_speed_kmh` (numeric),
+#'   `min_segment_duration_min` (numeric),
+#'   `max_rally_strokes` (a named list with `default`, `mini_tennis`,
+#'   `forehand_cross_court` and `backhand_cross_court`; the "me" side's
+#'   strokes), `max_stroke_gap_sec` (a named list with `forehand_cross_court`,
+#'   `backhand_cross_court` and `net_volley`, in seconds; look up via
+#'   [rally_split_gap_sec()]), `pause_split_regimes` (character -- the
+#'   regimes the pause rule splits), and `split_requires_starter_next`
+#'   (logical -- a pause only splits a rally when the stroke after it is the
+#'   rally starter's).
 #' @export
 dq_params <- function() {
   list(
     max_mean_stroke_speed_kmh = 100,
-    max_rally_strokes = list(default = 40, mini_tennis = 50),
-    max_stroke_gap_sec = 4
+    max_individual_stroke_speed_kmh = 160,
+    min_segment_duration_min = 3,
+    max_rally_strokes = list(
+      default = 25, mini_tennis = 50,
+      forehand_cross_court = 20, backhand_cross_court = 20
+    ),
+    max_stroke_gap_sec = list(
+      forehand_cross_court = 3, backhand_cross_court = 3,
+      net_volley = 2
+    ),
+    pause_split_regimes = c("forehand_cross_court", "backhand_cross_court", "net_volley"),
+    split_requires_starter_next = TRUE
   )
 }
 
-#' Flag rallies whose stroke count or mean stroke speed exceeds threshold
+#' Look up the max-rally-stroke threshold for a regime
 #'
-#' @param rallies A tibble with (at least) `regime`, `n_shots`.
+#' The single place the regime -> stroke-limit mapping of [dq_params()]'s
+#' `max_rally_strokes` is implemented.
+#'
+#' @param regime Character vector of regime values (e.g. `rallies$regime`).
+#' @param params A `dq_params()`-shaped list.
+#' @return A numeric vector, same length as `regime`: the regime's own
+#'   threshold if `max_rally_strokes` names it, else `default`.
+#' @export
+rally_stroke_threshold <- function(regime, params = dq_params()) {
+  vals <- unlist(params$max_rally_strokes)
+  out <- unname(vals[as.character(regime)])
+  out[is.na(out)] <- params$max_rally_strokes$default
+  out
+}
+
+#' Look up the rally-split pause threshold for a regime
+#'
+#' The pause (seconds) above which a pause before a rally-starter stroke
+#' splits a rally. Only the regimes in `params$pause_split_regimes` have one;
+#' any other regime is never pause-split and gets `NA`.
+#'
+#' @param regime Character vector of regime values (e.g. `rallies$regime`).
+#' @param params A `dq_params()`-shaped list.
+#' @return A numeric vector, same length as `regime`; `NA` for a regime that
+#'   is not pause-split.
+#' @export
+rally_split_gap_sec <- function(regime, params = dq_params()) {
+  regime <- as.character(regime)
+  vals <- unlist(params$max_stroke_gap_sec)
+  out <- unname(vals[regime])
+  out[!regime %in% params$pause_split_regimes] <- NA_real_
+  out
+}
+
+#' Count one player's strokes in each rally
+#'
+#' A rally's `n_shots` counts both players' strokes; the stroke limits count
+#' the "me" side's only. A stroke belongs to a rally when it is in the same
+#' match and carries that rally's `rally_id` (the same rule the split code
+#' uses); a stroke with an `NA` `rally_id` belongs to no rally. Only when
+#' `shot_detail` has no `rally_id` column at all does it fall back to
+#' counting strokes whose `started_at` falls between the rally's `start_time`
+#' and `end_time` (inclusive).
+#'
+#' @param rallies Rally tibble with `match_id`, `rally_id`, `start_time`,
+#'   `end_time`.
+#' @param shot_detail Per-stroke tibble with `match_id`, `player`,
+#'   `started_at`, and normally `rally_id`.
+#' @param me_side Which `player` value counts as "me" (`"guest"` by default).
+#' @param col Name of the new column (`"me_shots"` by default).
+#' @return `rallies` with a new integer column `col` (0 when the player hit
+#'   nothing in that rally).
+#' @export
+rally_player_strokes <- function(rallies, shot_detail, me_side = "guest", col = "me_shots") {
+  need_r <- c("match_id", "rally_id", "start_time", "end_time")
+  need_s <- c("match_id", "player", "started_at")
+  if (!all(need_r %in% names(rallies))) {
+    cli::cli_abort("{.arg rallies} needs {.val {need_r}}.")
+  }
+  if (!all(need_s %in% names(shot_detail))) {
+    cli::cli_abort("{.arg shot_detail} needs {.val {need_s}}.")
+  }
+  rallies[[col]] <- NULL
+  mine <- shot_detail[shot_detail$player %in% me_side, ]
+  if ("rally_id" %in% names(shot_detail)) {
+    # Count by rally_id, as the split code does; strokes with an NA rally_id
+    # belong to no rally.
+    counts <- mine[!is.na(mine$rally_id), c("match_id", "rally_id")] |>
+      dplyr::mutate(rally_id = as.character(.data$rally_id)) |>
+      dplyr::count(.data$match_id, .data$rally_id, name = col)
+    rallies$.rid_chr <- as.character(rallies$rally_id)
+    out <- dplyr::left_join(
+      rallies, dplyr::rename(counts, .rid_chr = "rally_id"),
+      by = c("match_id", ".rid_chr")
+    )
+    out$.rid_chr <- NULL
+  } else {
+    # Fallback only when strokes carry no rally_id: count by time window.
+    keys <- rallies[, need_r]
+    counts <- dplyr::inner_join(
+      keys, mine[, c("match_id", "started_at")],
+      by = dplyr::join_by(match_id, dplyr::between(y$started_at, x$start_time, x$end_time))
+    ) |>
+      dplyr::count(.data$match_id, .data$rally_id, name = col)
+    out <- dplyr::left_join(rallies, counts, by = c("match_id", "rally_id"))
+  }
+  out[[col]] <- as.integer(dplyr::coalesce(out[[col]], 0L))
+  out
+}
+
+#' Flag rallies whose stroke count, mean speed, or single fastest stroke
+#' exceeds threshold
+#'
+#' The third check catches a single implausible stroke hidden inside an
+#' otherwise plausible rally, which the mean-speed check alone dilutes away
+#' (see [dq_params()]'s `max_individual_stroke_speed_kmh`). `max_speed_kmh`
+#' is an OPTIONAL column of `rally_speed_kmh`: without it the check never
+#' fires, so callers that do not supply it behave as before.
+#'
+#' @param rallies A tibble with (at least) `match_id`, `rally_id`, `regime`,
+#'   `me_shots` (see [rally_player_strokes()]; the stroke limits count the
+#'   "me" side's strokes only).
 #' @param rally_speed_kmh A tibble with (at least) `match_id`, `rally_id`,
-#'   `speed_kmh` (mean stroke speed for that rally) — see
+#'   `speed_kmh` (mean stroke speed for that rally), and OPTIONALLY
+#'   `max_speed_kmh` (that rally's single fastest stroke) — see
 #'   `scripts/make_artifact_charts.R`'s `rally_speed_per_rally`.
 #' @return `rallies` with a new `flag_reason` character column (`NA` when
-#'   not flagged; one row can carry only one reason, stroke-count checked
-#'   first).
+#'   not flagged; one row can carry only one reason, checked in this order:
+#'   stroke count, mean speed, individual stroke speed).
 #' @export
 dq_flag_rallies <- function(rallies, rally_speed_kmh) {
+  if (!"me_shots" %in% names(rallies)) {
+    cli::cli_abort("{.arg rallies} needs a {.field me_shots} column (see {.fn rally_player_strokes}).")
+  }
   p <- dq_params()
-  max_strokes <- ifelse(
-    rallies$regime == "mini_tennis",
-    p$max_rally_strokes$mini_tennis,
-    p$max_rally_strokes$default
-  )
+  max_strokes <- rally_stroke_threshold(rallies$regime, p)
   rallies <- dplyr::left_join(rallies, rally_speed_kmh, by = c("match_id", "rally_id"))
+  max_speed_flag <- if ("max_speed_kmh" %in% names(rallies)) {
+    !is.na(rallies$max_speed_kmh) & rallies$max_speed_kmh > p$max_individual_stroke_speed_kmh
+  } else {
+    FALSE
+  }
   rallies$flag_reason <- dplyr::case_when(
-    rallies$n_shots > max_strokes ~ sprintf("rally > %d strokes (regime threshold)", max_strokes),
+    rallies$me_shots > max_strokes ~ sprintf("rally > %d strokes (drill limit)", as.integer(max_strokes)),
     !is.na(rallies$speed_kmh) & rallies$speed_kmh > p$max_mean_stroke_speed_kmh ~
       sprintf("mean stroke speed > %d km/h", p$max_mean_stroke_speed_kmh),
+    max_speed_flag ~
+      sprintf("individual stroke speed > %d km/h", as.integer(p$max_individual_stroke_speed_kmh)),
     TRUE ~ NA_character_
   )
   rallies
+}
+
+#' Count the rallies a data-quality flag touched
+#'
+#' The "N of M rallies excluded" figure shown next to a chart. It counts the
+#' raw rallies that were flagged (`sum(!is.na(flag_reason))`), NOT a
+#' row-count difference such as `n_flagged - nrow(corrected)`: a flagged
+#' rally that [dq_corrected_rallies()] splits into two surviving sub-rallies
+#' increases the corrected row count, so that difference can go negative
+#' ("-5 of 937 rallies excluded"). Compute the flagged set once with
+#' [dq_flag_rallies()] and reuse this count for every chart and audit table.
+#' "Excluded" means flagged, i.e. a rally the data-quality checks object to;
+#' it does not mean the rally is absent from [dq_corrected_rallies()], since a
+#' flagged rally can still contribute surviving sub-rallies after a split.
+#'
+#' @param rallies_flagged Output of [dq_flag_rallies()] (needs a
+#'   `flag_reason` column).
+#' @return A single non-negative integer.
+#' @export
+dq_excluded_count <- function(rallies_flagged) {
+  if (!"flag_reason" %in% names(rallies_flagged)) {
+    cli::cli_abort(c(
+      "x" = "{.arg rallies_flagged} needs a {.field flag_reason} column.",
+      "i" = "Build it with {.fn dq_flag_rallies}."
+    ))
+  }
+  sum(!is.na(rallies_flagged$flag_reason))
 }
 
 #' Inter-stroke gap times within every rally
@@ -133,145 +277,103 @@ dq_stroke_gaps <- function(shot_detail) {
   dplyr::select(d, match_id, rally_id, gap_sec)
 }
 
-#' Propose splits for rallies flagged for an excess stroke count
+#' Pause-rule split points for one rally
 #'
-#' For every rally in `rallies_flagged` currently flagged for exceeding its
-#' stroke-count threshold (not the speed threshold — a fast rally isn't a
-#' grouping-boundary problem), looks up its shots in `shot_detail` and
-#' proposes a split in **two passes**:
+#' The single place the rally-boundary rule is applied, shared by
+#' [split_flagged_rallies()] and [dq_corrected_rallies()] so the two cannot
+#' disagree. A boundary after stroke `i` needs BOTH a pause strictly over
+#' [rally_split_gap_sec()] AND -- when `params$split_requires_starter_next`
+#' is `TRUE` -- stroke `i + 1` to belong to the rally starter. Only the
+#' regimes in `params$pause_split_regimes` are split. The stroke limit plays
+#' no part: it only flags.
 #'
-#' 1. **Gap-threshold pass** — [find_rally_splits()] against the
-#'    calibrated `params$max_stroke_gap_sec` (a genuine, independently
-#'    plausible pause). Today's data has none (see `dq_params()`'s docs).
-#' 2. **Forced-largest-gap pass** (2026-09-01, issue #14 reopened) —
-#'    for any rally STILL over its stroke threshold after pass 1 finds
-#'    nothing, split at the single largest internal gap regardless of
-#'    whether that gap alone clears the absolute threshold. A rally that
-#'    violates `max_rally_strokes` represents more than one real point by
-#'    definition; pass 1 alone was silently leaving it unresolved on the
-#'    Exceptions page ("no qualifying gap — unsplit" for every one of the
-#'    14 flagged rallies) instead of proposing the best available split
-#'    point. This is a single split, not recursive re-splitting — a
-#'    sub-rally that's still over threshold afterwards is reported as such
-#'    (`still_flagged`), not force-resolved further.
-#'
-#' This is a **proposed** correction for human review (the Exceptions
-#' page's before/after table) — it does NOT write anything back to
-#' `tennis.duckdb`, and does not feed any other chart. A rally with no
-#' internal gap at all (a single-shot artifact — `nrow(shots) < 2`) passes
-#' through unsplit, not silently dropped from the output.
-#'
-#' @param rallies_flagged Output of [dq_flag_rallies()] — must include
-#'   `match_id`, `rally_id`, `regime`, `n_shots`, `flag_reason`.
-#' @param shot_detail A tibble with (at least) `match_id`, `rally_id`,
-#'   `started_at` — see `tennis_shot_detail()` in `R/db.R`.
-#' @param params A `dq_params()`-shaped list; pass a custom one to explore a
-#'   different threshold.
-#' @return A tibble, one row per proposed sub-rally: `match_id` (rally IDs
-#'   are only unique WITHIN a match — several flagged rallies can share the
-#'   same numeric `rally_id` across different matches, so `match_id` is
-#'   required to disambiguate), `orig_rally_id`, `orig_n_shots`,
-#'   `new_rally_id`, `new_n_shots`, `split` (logical — was this rally
-#'   actually split), `split_method` (`"none"` / `"gap_threshold"` /
-#'   `"forced_largest_gap"`), `still_flagged` (logical — does the new
-#'   sub-rally still exceed its own regime's stroke threshold).
-#' @export
-#' Split a rally repeatedly until no fragment exceeds the stroke threshold
-#'
-#' issue #42. The previous behaviour split an over-long rally **once**,
-#' at its single largest internal gap, which leaves any rally longer than
-#' twice the threshold still over it — a 121-stroke rally became 91 + 30 and
-#' the 91 was reported as "still over threshold" rather than split again.
-#' The point-count violation is the trigger to split, so it has to keep
-#' being applied until it is no longer violated.
-#'
-#' Greedy and deterministic: repeatedly take the first fragment still over
-#' `max_strokes` and cut it at its own largest internal gap. Terminates
-#' because each pass adds one split point and there are at most `n - 1` of
-#' them; stops early and returns what it has if a fragment has no interior
-#' point left to cut (a run of strokes with no gap between them cannot be
-#' divided, and silently pretending otherwise would be worse than reporting
-#' it still flagged).
-#'
-#' @param gaps Numeric gaps between consecutive strokes; `gaps[i]` is the
-#'   pause between stroke `i` and `i + 1`, so a split "after `i`" uses index
-#'   `i`. Length `n - 1`.
-#' @param n Number of strokes in the rally.
-#' @param max_strokes Threshold above which a fragment must be split again.
-#' @param seed Split indices already decided by the gap-threshold pass. They
-#'   are kept and only topped up. Passing them matters: a gap-threshold split
-#'   can itself leave a fragment over the threshold (observed on the 8 Jun
-#'   rally 42 -- 51 strokes cut into 8 + 43, with 43 still over 40), and
-#'   before this the forced pass ran only when the gap pass found *nothing*,
-#'   so that fragment was reported "still over threshold" and left alone.
-#' @return An increasing integer vector of split indices, possibly empty.
+#' @param shots One rally's strokes, ordered by `started_at`, with `player`.
+#' @param regime The rally's regime (a single string).
+#' @param params A `dq_params()`-shaped list.
+#' @param rally_starter Which `player` value starts rallies (`"host"`).
+#' @return An integer vector of split indices as in [find_rally_splits()].
 #' @keywords internal
-force_splits_until_under <- function(gaps, n, max_strokes, seed = integer(0)) {
-  splits <- sort(unique(as.integer(seed)))
-  if (n < 2L || max_strokes < 1L) return(splits)
-  repeat {
-    bounds <- c(0L, splits, n)
-    sizes  <- diff(bounds)
-    over   <- which(sizes > max_strokes)
-    if (length(over) == 0L) break
-    k  <- over[1L]
-    lo <- bounds[k]
-    hi <- bounds[k + 1L]
-    cand <- setdiff(seq.int(lo + 1L, hi - 1L), splits)
-    if (length(cand) == 0L) break   # nothing left to cut; caller reports it
-    # Largest gap wins; ties break toward the fragment's midpoint. Without
-    # the tie-break, a fragment whose gaps are all equal (common at 1-second
-    # timestamp resolution) splits at its FIRST candidate every pass, shaving
-    # one stroke at a time -- 45 stroked becomes 1+1+1+...+43 instead of
-    # 22+23. Balanced cuts also need far fewer passes.
-    mid  <- (lo + hi) / 2
-    best <- cand[order(-gaps[cand], abs(cand - mid))][1L]
-    splits <- sort(c(splits, best))
+rally_pause_splits <- function(shots, regime, params = dq_params(), rally_starter = "host") {
+  if (nrow(shots) < 2L || !regime %in% params$pause_split_regimes) {
+    return(integer(0))
   }
-  splits
+  is_starter <- if (isTRUE(params$split_requires_starter_next)) shots$player %in% rally_starter else NULL
+  find_rally_splits(
+    shots$started_at,
+    max_gap_sec = rally_split_gap_sec(regime, params),
+    is_starter = is_starter
+  )
 }
 
-split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_params()) {
-  stroke_flagged <- rallies_flagged |>
-    dplyr::filter(!is.na(flag_reason), grepl("strokes", flag_reason))
+# Sub-rally suffix: a..z, then z27, z28, ... (never NA, so ids stay unique).
+rally_piece_suffix <- function(k) ifelse(k <= 26L, letters[pmin(k, 26L)], sprintf("z%d", k))
+
+#' Propose the pause-rule split of every rally, for human review
+#'
+#' Runs the pause rule ([rally_pause_splits()]) on EVERY rally of a
+#' pause-split regime -- not only the ones over their stroke limit -- because
+#' the vendor's own grouping (`pid`) can merge real rallies well under the
+#' limit. Other regimes are never split; rallies flagged only for speed are
+#' skipped (dropped, not a grouping problem).
+#'
+#' Output covers every rally the rule splits (one row per sub-rally), plus
+#' every rally still over its stroke limit that has NO qualifying pause (one
+#' unsplit row, `still_flagged` `TRUE`). **The stroke limit only flags:
+#' nothing is force-split.** Unsplit rallies within their limit are omitted.
+#'
+#' A **proposal** for human review: nothing is written back to the database.
+#'
+#' @param rallies_flagged Output of [dq_flag_rallies()] -- must include
+#'   `match_id`, `rally_id`, `regime`, `flag_reason`.
+#' @param shot_detail A tibble with (at least) `match_id`, `rally_id`,
+#'   `player`, `started_at` -- see `tennis_shot_detail()` in `R/db.R`.
+#' @param params A `dq_params()`-shaped list; pass a custom one to explore a
+#'   different threshold.
+#' @param me_side Which `player` value counts as "me" (`"guest"`).
+#' @param rally_starter Which `player` value starts rallies (`"host"`).
+#' @return A tibble, one row per sub-rally: `match_id` (rally IDs are only
+#'   unique WITHIN a match), `orig_rally_id`, `orig_n_shots`, `new_rally_id`,
+#'   `new_n_shots` (the "me" side's strokes, as for every limit), `split`
+#'   (logical), `split_method` (`"none"` / `"gap_threshold"`),
+#'   `still_flagged` (logical -- does the sub-rally still exceed its own
+#'   regime's stroke threshold).
+#' @keywords internal
+split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_params(),
+                                  me_side = "guest", rally_starter = "host") {
+  candidates <- rallies_flagged |>
+    dplyr::filter(is.na(flag_reason) | grepl("strokes", flag_reason))
 
   rows <- Map(
-    function(mid, rid, regime, orig_n) {
+    function(mid, rid, regime) {
       shots <- shot_detail |>
         dplyr::filter(match_id == mid, rally_id == rid) |>
         dplyr::arrange(started_at)
-      max_strokes <- if (regime == "mini_tennis") params$max_rally_strokes$mini_tennis else params$max_rally_strokes$default
+      max_strokes <- rally_stroke_threshold(regime, params)
+      is_me <- as.numeric(shots$player %in% me_side)
+      orig_n <- sum(is_me)
 
-      splits <- find_rally_splits(shots$started_at, max_gap_sec = params$max_stroke_gap_sec)
-      n_gap_splits <- length(splits)
-      method <- if (n_gap_splits > 0L) "gap_threshold" else "none"
-
-      # Pass 2: keep splitting until nothing is over threshold. Seeded with
-      # pass 1's splits, so a high-confidence cut that still leaves an
-      # over-length fragment gets topped up rather than left flagged.
-      if (orig_n > max_strokes && nrow(shots) >= 2L) {
-        gaps <- as.numeric(diff(shots$started_at))
-        splits <- force_splits_until_under(gaps, nrow(shots), max_strokes, seed = splits)
-        method <- if (n_gap_splits == 0L) "forced_largest_gap"
-                  else if (length(splits) > n_gap_splits) "gap_threshold_topped_up"
-                  else "gap_threshold"
-      }
+      splits <- rally_pause_splits(shots, regime, params, rally_starter)
 
       if (length(splits) == 0L) {
+        if (orig_n <= max_strokes) {
+          return(NULL)   # nothing to review
+        }
         return(tibble::tibble(
-          match_id = mid, orig_rally_id = as.character(rid), orig_n_shots = orig_n, new_rally_id = as.character(rid),
-          new_n_shots = orig_n, split = FALSE, split_method = method, still_flagged = orig_n > max_strokes
+          match_id = mid, orig_rally_id = as.character(rid), orig_n_shots = orig_n,
+          new_rally_id = as.character(rid), new_n_shots = orig_n,
+          split = FALSE, split_method = "none", still_flagged = TRUE
         ))
       }
       bounds <- c(0L, splits, nrow(shots))
-      sizes  <- diff(bounds)
+      sizes  <- diff(c(0, cumsum(is_me))[bounds + 1L])
       tibble::tibble(
         match_id = mid, orig_rally_id = as.character(rid), orig_n_shots = orig_n,
-        new_rally_id  = sprintf("%s_%s", rid, letters[seq_along(sizes)]),
-        new_n_shots   = sizes, split = TRUE, split_method = method, still_flagged = sizes > max_strokes
+        new_rally_id  = sprintf("%s_%s", rid, rally_piece_suffix(seq_along(sizes))),
+        new_n_shots   = sizes, split = TRUE, split_method = "gap_threshold",
+        still_flagged = sizes > max_strokes
       )
     },
-    stroke_flagged$match_id, stroke_flagged$rally_id, stroke_flagged$regime, stroke_flagged$n_shots
+    candidates$match_id, candidates$rally_id, candidates$regime
   )
 
   dplyr::bind_rows(rows)
@@ -279,52 +381,38 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 
 #' The rallies actually usable for plotting — data-quality corrected
 #'
-#' Single source of truth for "which rallies may feed a chart" (the issue tracker
-#' #28, reopening #14 again): every rally-derived chart in
-#' `scripts/make_artifact_charts.R` reads from this function's output
-#' instead of the raw `rallies` table, so an implausible outlier (too many
-#' strokes for one continuous point, or an implausible mean stroke speed —
-#' see [dq_flag_rallies()]) is fixed or dropped BEFORE it reaches a chart,
-#' not just flagged for a human to notice afterwards on the Exceptions
-#' page. [split_flagged_rallies()]'s proposal table (used by that page) is
-#' unaffected by this function and continues to read the raw, uncorrected
-#' `rallies` table directly — it is deliberately still showing the "before"
-#' picture.
+#' Single source of truth for "which rallies may feed a chart": every
+#' rally-derived chart reads from this function's output instead of the raw
+#' `rallies` table, so an implausible outlier is fixed or dropped BEFORE it
+#' reaches a chart, not just flagged for a human to notice afterwards.
+#' [split_flagged_rallies()]'s proposal table is unaffected by this function
+#' and continues to show the "before" picture.
 #'
 #' For every rally, in order:
 #'
-#' 1. Per-rally mean stroke speed (`speed_kmh`) is computed from `player ==
-#'    "guest"` shots only, in km/h — the same pattern
-#'    `scripts/make_artifact_charts.R`'s `rally_speed_per_rally` already
-#'    used, now centralised here.
+#' 1. The "me" side's strokes are counted per rally (`me_shots`, see
+#'    [rally_player_strokes()]) and the per-rally mean stroke speed
+#'    (`speed_kmh`) is computed from those strokes only, in km/h.
 #' 2. Rallies are flagged via [dq_flag_rallies()].
-#' 3. A rally flagged **only** for an implausible mean speed (not for
-#'    stroke count) is a corrupted-tracking problem, not a
-#'    rally-boundary/grouping problem — it is dropped outright, unchanged
-#'    from the flag-only behaviour `dq_flag_rallies()` already documents.
-#' 4. A rally flagged for stroke count gets the same two-pass split
-#'    treatment [split_flagged_rallies()] proposes for human review (reusing
-#'    [find_rally_splits()] directly rather than duplicating its gap-finding
-#'    logic — see that function's own docs) — but instead of just
-#'    *reporting* proposed sub-rally sizes, each shot is actually assigned
-#'    to a new sub-rally and every downstream stat is recomputed straight
-#'    from that shot subset: `n_shots`, `start_time`/`end_time` (min/max
-#'    `started_at` in the subset), `duration_sec` (their difference in
-#'    seconds), and `speed_kmh` (mean guest `shot_speed_mph` in the subset,
-#'    converted to km/h). Each sub-rally gets a new, disambiguated
-#'    `rally_id` (`"<orig>_<letter>"`, matching
-#'    [split_flagged_rallies()]'s `new_rally_id` convention) — `rally_id` is
-#'    therefore always returned as **character**, not numeric, even for
-#'    rallies that were never split (`rally_id` alone is only unique WITHIN
-#'    a match to begin with; see [tennis_rallies()]).
-#' 5. A rally with fewer than 2 shots (can't be split at all), or a
-#'    sub-rally that's STILL over its own regime's stroke threshold after
-#'    the best-effort split, is dropped — not force-resolved further, and
-#'    not silently included. This matches [split_flagged_rallies()]'s
-#'    `still_flagged` semantics, applied here as an actual exclusion
-#'    instead of a flag for a human to read.
-#' 6. Every rally that was never flagged at all passes through unchanged,
-#'    with `speed_kmh` attached.
+#' 3. A rally flagged **only** for an implausible mean speed is a
+#'    corrupted-tracking problem, not a grouping problem -- it is dropped
+#'    outright. The same holds for a rally holding a single implausibly fast
+#'    stroke (`max_individual_stroke_speed_kmh`).
+#' 4. **The pause rule runs on every other rally of a pause-split regime
+#'    (cross-court and net-volley), flagged or not**: a pause strictly over
+#'    [rally_split_gap_sec()] before a rally-starter stroke is a boundary
+#'    ([rally_pause_splits()]). Each shot is assigned to a new sub-rally and
+#'    `n_shots`, `me_shots`, `start_time`/`end_time`, `duration_sec` and
+#'    `speed_kmh` are recomputed from that subset. Sub-rally ids are
+#'    `"<orig>_<letter>"`; `rally_id` is always returned as **character**.
+#' 5. The stroke limit only FLAGS. There is no forced split: a rally, or a
+#'    sub-rally, still over its regime's limit (including a rally with no
+#'    qualifying pause) is left out and stays flagged. A valid sibling
+#'    sub-rally is kept. Because a stroke-count flag hides any speed reason,
+#'    each sub-rally is also re-checked against the mean-speed and
+#'    individual-stroke-speed limits and dropped if it fails either.
+#' 6. Every unflagged rally with no qualifying pause passes through
+#'    unchanged, with `speed_kmh` attached.
 #'
 #' @param rallies A tibble from [tennis_rallies()] (or equivalently shaped)
 #'   — `match_id`, `rally_id`, `regime`, `regime_occurrence`,
@@ -333,91 +421,95 @@ split_flagged_rallies <- function(rallies_flagged, shot_detail, params = dq_para
 #'   `rally_id`, `player`, `started_at`, `shot_speed_mph`.
 #' @param params A `dq_params()`-shaped list; pass a custom one to explore a
 #'   different threshold.
-#' @return A tibble shaped like `rallies` (`match_id`, `rally_id` —
-#'   character, `regime`, `regime_occurrence`, `segment_index`, `n_shots`,
-#'   `duration_sec`, `start_time`, `end_time`) plus `speed_kmh`. A rally
-#'   present in `rallies` can be ABSENT here — dropped, never silently
-#'   merged into another rally's row — when it (or every one of its
-#'   best-effort sub-rallies) is still implausible after correction. No row
-#'   in the output exceeds its own regime's `max_rally_strokes` threshold.
+#' @param me_side Which `player` value counts as "me" (`"guest"`).
+#' @param rally_starter Which `player` value starts rallies (`"host"`, the
+#'   feeder).
+#' @return A tibble shaped like `rallies` (`rally_id` — character) plus
+#'   `speed_kmh` and `me_shots`. A rally present in `rallies` can be ABSENT
+#'   here -- dropped, never silently merged into another rally's row -- when
+#'   it (or a sub-rally) is still implausible after the pause split. No row
+#'   exceeds its own regime's `max_rally_strokes` threshold.
 #' @export
-dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params()) {
+dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
+                                 me_side = "guest", rally_starter = "host") {
+  rallies <- rally_player_strokes(rallies, shot_detail, me_side)
   rally_speed <- shot_detail |>
-    dplyr::filter(player == "guest", !is.na(rally_id)) |>
+    dplyr::filter(player %in% me_side, !is.na(rally_id)) |>
     dplyr::group_by(match_id, rally_id) |>
-    dplyr::summarise(speed_kmh = mean(shot_speed_mph, na.rm = TRUE) * 1.609344, .groups = "drop")
+    dplyr::summarise(
+      speed_kmh = mean(shot_speed_mph, na.rm = TRUE) * 1.609344,
+      max_speed_kmh = if (all(is.na(shot_speed_mph))) NA_real_ else max(shot_speed_mph, na.rm = TRUE) * 1.609344,
+      .groups = "drop"
+    )
 
   rallies_flagged <- dq_flag_rallies(rallies, rally_speed)
 
-  unflagged <- rallies_flagged |>
-    dplyr::filter(is.na(flag_reason)) |>
-    dplyr::mutate(rally_id = as.character(rally_id)) |>
-    dplyr::select(
-      match_id, rally_id, regime, regime_occurrence, segment_index,
-      n_shots, duration_sec, start_time, end_time, speed_kmh
-    )
-
-  # Stroke-count-flagged rallies only -- a speed-only flag is a corrupted-
-  # tracking problem, not a grouping/splitting problem, and is dropped
-  # outright (never reaches `split_pieces` below, so never reappears).
-  stroke_flagged <- rallies_flagged |>
-    dplyr::filter(!is.na(flag_reason), grepl("strokes", flag_reason))
+  # A speed-only flag is a corrupted-tracking problem, not a grouping
+  # problem: dropped outright, never split. Everything else -- unflagged or
+  # stroke-count-flagged -- gets the pause rule.
+  candidates <- rallies_flagged |>
+    dplyr::filter(is.na(flag_reason) | grepl("strokes", flag_reason))
 
   split_pieces <- Map(
-    function(mid, rid, regime, regime_occurrence, segment_index, orig_n) {
+    function(mid, rid, regime, regime_occurrence, segment_index) {
       shots <- shot_detail |>
         dplyr::filter(match_id == mid, rally_id == rid) |>
         dplyr::arrange(started_at)
-      max_strokes <- if (regime == "mini_tennis") params$max_rally_strokes$mini_tennis else params$max_rally_strokes$default
 
-      # Same two-pass split-point search as split_flagged_rallies() --
-      # reuses find_rally_splits() rather than duplicating its logic.
-      splits <- find_rally_splits(shots$started_at, max_gap_sec = params$max_stroke_gap_sec)
-      if (orig_n > max_strokes && nrow(shots) >= 2L) {
-        gaps <- as.numeric(diff(shots$started_at))
-        splits <- force_splits_until_under(gaps, nrow(shots), max_strokes, seed = splits)
-      }
-
-      # No qualifying split point (including the < 2 shots case, where
-      # find_rally_splits() always returns none) -- can't be resolved, drop.
-      if (length(splits) == 0L || nrow(shots) < 2L) {
+      splits <- rally_pause_splits(shots, regime, params, rally_starter)
+      if (length(splits) == 0L) {
         return(NULL)
       }
 
       bounds <- c(0L, splits, nrow(shots))
       sub_rows <- lapply(seq_len(length(bounds) - 1L), function(k) {
-        sub_shots  <- shots[(bounds[k] + 1L):bounds[k + 1L], ]
-        sub_guest  <- sub_shots[sub_shots$player == "guest", ]
+        sub_shots <- shots[(bounds[k] + 1L):bounds[k + 1L], ]
+        sub_me    <- sub_shots[sub_shots$player %in% me_side, ]
         tibble::tibble(
           match_id          = mid,
-          rally_id          = sprintf("%s_%s", rid, letters[k]),
+          rally_id          = sprintf("%s_%s", rid, rally_piece_suffix(k)),
           regime            = regime,
           regime_occurrence = regime_occurrence,
           segment_index     = segment_index,
           n_shots           = nrow(sub_shots),
+          me_shots          = nrow(sub_me),
           duration_sec      = as.numeric(difftime(max(sub_shots$started_at), min(sub_shots$started_at), units = "secs")),
           start_time        = min(sub_shots$started_at),
           end_time          = max(sub_shots$started_at),
-          speed_kmh         = if (nrow(sub_guest) > 0L) mean(sub_guest$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_
+          speed_kmh         = if (nrow(sub_me) > 0L) mean(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_,
+          max_speed_kmh     = if (nrow(sub_me) > 0L && !all(is.na(sub_me$shot_speed_mph))) max(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_
         )
       })
       dplyr::bind_rows(sub_rows)
     },
-    stroke_flagged$match_id, stroke_flagged$rally_id, stroke_flagged$regime,
-    stroke_flagged$regime_occurrence, stroke_flagged$segment_index, stroke_flagged$n_shots
+    candidates$match_id, candidates$rally_id, candidates$regime,
+    candidates$regime_occurrence, candidates$segment_index
   )
+  was_split    <- !vapply(split_pieces, is.null, logical(1))
   split_result <- dplyr::bind_rows(split_pieces)
 
   if (nrow(split_result) > 0L) {
-    max_strokes_vec <- ifelse(
-      split_result$regime == "mini_tennis",
-      params$max_rally_strokes$mini_tennis,
-      params$max_rally_strokes$default
-    )
-    # Drop any sub-rally still over its own regime threshold after the
-    # best-effort split -- per-row, so a valid sibling sub-rally is kept.
-    split_result <- split_result[split_result$n_shots <= max_strokes_vec, ]
+    max_strokes_vec <- rally_stroke_threshold(split_result$regime, params)
+    # A sub-rally still over its own regime's limit stays flagged and is left
+    # out -- per-row, so a valid sibling is kept.
+    # The same goes for the speed checks: a rally flagged for its stroke count
+    # carries only that reason, so a speed artefact is re-checked per piece.
+    ok_mean <- is.na(split_result$speed_kmh) | split_result$speed_kmh <= params$max_mean_stroke_speed_kmh
+    ok_max  <- is.na(split_result$max_speed_kmh) | split_result$max_speed_kmh <= params$max_individual_stroke_speed_kmh
+    split_result <- split_result[split_result$me_shots <= max_strokes_vec & ok_mean & ok_max, ]
+    split_result$max_speed_kmh <- NULL
+  } else if ("max_speed_kmh" %in% names(split_result)) {
+    split_result$max_speed_kmh <- NULL
   }
 
-  dplyr::bind_rows(unflagged, split_result)
+  # Unflagged and no qualifying pause: passes through unchanged. Flagged and
+  # no qualifying pause: not split, left out (still flagged).
+  unsplit_ok <- candidates[!was_split & is.na(candidates$flag_reason), ] |>
+    dplyr::mutate(rally_id = as.character(rally_id)) |>
+    dplyr::select(
+      match_id, rally_id, regime, regime_occurrence, segment_index,
+      n_shots, me_shots, duration_sec, start_time, end_time, speed_kmh
+    )
+
+  dplyr::bind_rows(unsplit_ok, split_result)
 }

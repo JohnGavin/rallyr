@@ -22,6 +22,6 @@ values. Safe to publish alongside a public package template (the issue tracker
 #9/#31) even though \code{con} may point at the real, private \code{tennis.duckdb}
 — the return carries only column definitions, never a data value or a
 count of rows. Also the natural building block for a derived-data API
-(issue #44), since a consumer of that API needs to know the shape of
+(see rallyr#8), since a consumer of that API needs to know the shape of
 what it can query before querying it.
 }

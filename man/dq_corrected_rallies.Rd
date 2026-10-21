@@ -4,7 +4,13 @@
 \alias{dq_corrected_rallies}
 \title{The rallies actually usable for plotting — data-quality corrected}
 \usage{
-dq_corrected_rallies(rallies, shot_detail, params = dq_params())
+dq_corrected_rallies(
+  rallies,
+  shot_detail,
+  params = dq_params(),
+  me_side = "guest",
+  rally_starter = "host"
+)
 }
 \arguments{
 \item{rallies}{A tibble from \code{\link[=tennis_rallies]{tennis_rallies()}} (or equivalently shaped)
@@ -16,62 +22,52 @@ dq_corrected_rallies(rallies, shot_detail, params = dq_params())
 
 \item{params}{A \code{dq_params()}-shaped list; pass a custom one to explore a
 different threshold.}
+
+\item{me_side}{Which \code{player} value counts as "me" (\code{"guest"}).}
+
+\item{rally_starter}{Which \code{player} value starts rallies (\code{"host"}, the
+feeder).}
 }
 \value{
-A tibble shaped like \code{rallies} (\code{match_id}, \code{rally_id} —
-character, \code{regime}, \code{regime_occurrence}, \code{segment_index}, \code{n_shots},
-\code{duration_sec}, \code{start_time}, \code{end_time}) plus \code{speed_kmh}. A rally
-present in \code{rallies} can be ABSENT here — dropped, never silently
-merged into another rally's row — when it (or every one of its
-best-effort sub-rallies) is still implausible after correction. No row
-in the output exceeds its own regime's \code{max_rally_strokes} threshold.
+A tibble shaped like \code{rallies} (\code{rally_id} — character) plus
+\code{speed_kmh} and \code{me_shots}. A rally present in \code{rallies} can be ABSENT
+here -- dropped, never silently merged into another rally's row -- when
+it (or a sub-rally) is still implausible after the pause split. No row
+exceeds its own regime's \code{max_rally_strokes} threshold.
 }
 \description{
-Single source of truth for "which rallies may feed a chart" (the issue tracker
-#28, reopening #14 again): every rally-derived chart in
-\code{scripts/make_artifact_charts.R} reads from this function's output
-instead of the raw \code{rallies} table, so an implausible outlier (too many
-strokes for one continuous point, or an implausible mean stroke speed —
-see \code{\link[=dq_flag_rallies]{dq_flag_rallies()}}) is fixed or dropped BEFORE it reaches a chart,
-not just flagged for a human to notice afterwards on the Exceptions
-page. \code{\link[=split_flagged_rallies]{split_flagged_rallies()}}'s proposal table (used by that page) is
-unaffected by this function and continues to read the raw, uncorrected
-\code{rallies} table directly — it is deliberately still showing the "before"
-picture.
+Single source of truth for "which rallies may feed a chart": every
+rally-derived chart reads from this function's output instead of the raw
+\code{rallies} table, so an implausible outlier is fixed or dropped BEFORE it
+reaches a chart, not just flagged for a human to notice afterwards.
+\code{\link[=split_flagged_rallies]{split_flagged_rallies()}}'s proposal table is unaffected by this function
+and continues to show the "before" picture.
 }
 \details{
 For every rally, in order:
 \enumerate{
-\item Per-rally mean stroke speed (\code{speed_kmh}) is computed from \code{player == "guest"} shots only, in km/h — the same pattern
-\code{scripts/make_artifact_charts.R}'s \code{rally_speed_per_rally} already
-used, now centralised here.
+\item The "me" side's strokes are counted per rally (\code{me_shots}, see
+\code{\link[=rally_player_strokes]{rally_player_strokes()}}) and the per-rally mean stroke speed
+(\code{speed_kmh}) is computed from those strokes only, in km/h.
 \item Rallies are flagged via \code{\link[=dq_flag_rallies]{dq_flag_rallies()}}.
-\item A rally flagged \strong{only} for an implausible mean speed (not for
-stroke count) is a corrupted-tracking problem, not a
-rally-boundary/grouping problem — it is dropped outright, unchanged
-from the flag-only behaviour \code{dq_flag_rallies()} already documents.
-\item A rally flagged for stroke count gets the same two-pass split
-treatment \code{\link[=split_flagged_rallies]{split_flagged_rallies()}} proposes for human review (reusing
-\code{\link[=find_rally_splits]{find_rally_splits()}} directly rather than duplicating its gap-finding
-logic — see that function's own docs) — but instead of just
-\emph{reporting} proposed sub-rally sizes, each shot is actually assigned
-to a new sub-rally and every downstream stat is recomputed straight
-from that shot subset: \code{n_shots}, \code{start_time}/\code{end_time} (min/max
-\code{started_at} in the subset), \code{duration_sec} (their difference in
-seconds), and \code{speed_kmh} (mean guest \code{shot_speed_mph} in the subset,
-converted to km/h). Each sub-rally gets a new, disambiguated
-\code{rally_id} (\code{"<orig>_<letter>"}, matching
-\code{\link[=split_flagged_rallies]{split_flagged_rallies()}}'s \code{new_rally_id} convention) — \code{rally_id} is
-therefore always returned as \strong{character}, not numeric, even for
-rallies that were never split (\code{rally_id} alone is only unique WITHIN
-a match to begin with; see \code{\link[=tennis_rallies]{tennis_rallies()}}).
-\item A rally with fewer than 2 shots (can't be split at all), or a
-sub-rally that's STILL over its own regime's stroke threshold after
-the best-effort split, is dropped — not force-resolved further, and
-not silently included. This matches \code{\link[=split_flagged_rallies]{split_flagged_rallies()}}'s
-\code{still_flagged} semantics, applied here as an actual exclusion
-instead of a flag for a human to read.
-\item Every rally that was never flagged at all passes through unchanged,
-with \code{speed_kmh} attached.
+\item A rally flagged \strong{only} for an implausible mean speed is a
+corrupted-tracking problem, not a grouping problem -- it is dropped
+outright. The same holds for a rally holding a single implausibly fast
+stroke (\code{max_individual_stroke_speed_kmh}).
+\item \strong{The pause rule runs on every other rally of a pause-split regime
+(cross-court and net-volley), flagged or not}: a pause strictly over
+\code{\link[=rally_split_gap_sec]{rally_split_gap_sec()}} before a rally-starter stroke is a boundary
+(\code{\link[=rally_pause_splits]{rally_pause_splits()}}). Each shot is assigned to a new sub-rally and
+\code{n_shots}, \code{me_shots}, \code{start_time}/\code{end_time}, \code{duration_sec} and
+\code{speed_kmh} are recomputed from that subset. Sub-rally ids are
+\code{"<orig>_<letter>"}; \code{rally_id} is always returned as \strong{character}.
+\item The stroke limit only FLAGS. There is no forced split: a rally, or a
+sub-rally, still over its regime's limit (including a rally with no
+qualifying pause) is left out and stays flagged. A valid sibling
+sub-rally is kept. Because a stroke-count flag hides any speed reason,
+each sub-rally is also re-checked against the mean-speed and
+individual-stroke-speed limits and dropped if it fails either.
+\item Every unflagged rally with no qualifying pause passes through
+unchanged, with \code{speed_kmh} attached.
 }
 }

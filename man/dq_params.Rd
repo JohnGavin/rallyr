@@ -8,79 +8,78 @@ dq_params()
 }
 \value{
 A named list: \code{max_mean_stroke_speed_kmh} (numeric),
-\code{max_rally_strokes} (a named list with \code{default} and \code{mini_tennis}),
-and \code{max_stroke_gap_sec} (numeric).
+\code{max_individual_stroke_speed_kmh} (numeric),
+\code{min_segment_duration_min} (numeric),
+\code{max_rally_strokes} (a named list with \code{default}, \code{mini_tennis},
+\code{forehand_cross_court} and \code{backhand_cross_court}; the "me" side's
+strokes), \code{max_stroke_gap_sec} (a named list with \code{forehand_cross_court},
+\code{backhand_cross_court} and \code{net_volley}, in seconds; look up via
+\code{\link[=rally_split_gap_sec]{rally_split_gap_sec()}}), \code{pause_split_regimes} (character -- the
+regimes the pause rule splits), and \code{split_requires_starter_next}
+(logical -- a pause only splits a rally when the stroke after it is the
+rally starter's).
 }
 \description{
 Centralises every magic-number threshold used to flag implausible rows
 (a mean rally stroke speed that's too fast to be real, a rally with too
 many strokes to plausibly be one continuous point) so they live in one
 place instead of scattered across chart-generation code, and so they can
-be recalibrated deliberately as more sessions accumulate. See
-issue #5.
+be recalibrated deliberately as more sessions accumulate.
 }
 \details{
-\code{max_rally_strokes} is a \emph{named list}, not a single number: \code{mini_tennis}
-is a deliberately slow, cooperative warm-up phase where a long
-continuous rally is genuinely plausible (see issue #3/#4's review of
-the 14 rallies already found above the \emph{original} default-regime
-threshold of 50 strokes — 12 of 14 were \code{mini_tennis}), so it gets its
-own, higher threshold. Every other regime uses \code{default}.
+\strong{Stroke limits are per drill and count one player's strokes.}
+\code{max_rally_strokes} is a \emph{named list} keyed by regime; the limit applies
+to the strokes of the player whose practice is being analysed (the "me"
+side, see \code{\link[=rally_player_strokes]{rally_player_strokes()}}), not to both players together.
+\code{mini_tennis} is a deliberately slow, cooperative warm-up where a long
+continuous rally is plausible, so it gets the highest limit (50). The
+single-wing cross-court drills (\code{forehand_cross_court},
+\code{backhand_cross_court}) get the lowest (20). Every other regime
+(\code{net_volley}, and anything not listed) uses \code{default} (25). Looked up via
+\code{\link[=rally_stroke_threshold]{rally_stroke_threshold()}}.
 
-\strong{Tightened 2026-09-01 (issue #14 and #28 reopened #14 again): 50/60
--> 40/50.} The original 50/60 pair was set from the \emph{first} pass at
-\code{split_flagged_rallies()} (its gap-threshold pass only), which at the
-time found no qualifying gap in the data and so never actually resolved
-any of those 14 rallies — the thresholds were, in effect, calibrated
-against unsplit, still-implausible rallies, not against genuinely
-plausible upper bounds for one continuous point. The user directly
-reported extreme outliers still coming through into the "Rally length
-distribution, by session and drill" chart under the old thresholds
-(>100 strokes for \code{mini_tennis}, >50 for the other drills) and asked for
-tighter values (\code{mini_tennis} 50, other drills 40) — this docstring no
-longer claims those numbers are independently re-derived from a fresh
-empirical review (no such review has been re-run since the 2026-08-31
-one that produced 50/60); they are the user-specified tightened bound,
-recorded here so the next recalibration starts from a stated number
-rather than a silently stale one. What DID change materially since
-50/60 was set: \code{\link[=dq_corrected_rallies]{dq_corrected_rallies()}} (added alongside this
-tightening) now actually applies \code{split_flagged_rallies()}'s two-pass
-split logic to every chart's input data, not just to the Exceptions
-page's proposal table — so a rally that would have silently stayed
-above the old, looser thresholds is now either split into plausible
-sub-rallies or dropped, before any chart ever sees it.
+These are FLAGS, not corrections -- a flagged row is surfaced for review,
+never silently dropped, altered, or excluded from the underlying database
+tables. Only chart-level \emph{display} filtering (with an explicit note of how
+many rows were excluded and why, see \code{\link[=dq_excluded_count]{dq_excluded_count()}}) may skip a
+flagged row.
 
-These are FLAGS, not corrections — a flagged row is surfaced for human
-review (see the artifact's Exceptions page), never silently dropped,
-altered, or excluded from the underlying \code{tennis.duckdb} tables. Only
-chart-level \emph{display} filtering (with an explicit on-chart note of how
-many rows were excluded and why) may skip a flagged row.
+\strong{The stroke limit only flags; it never splits.} The pause rule runs on
+every rally of a pause-split regime, whether or not the rally is over its
+limit; a rally or sub-rally still over its limit afterwards is flagged and
+left out of \code{\link[=dq_corrected_rallies]{dq_corrected_rallies()}}, never force-split.
 
-\code{max_stroke_gap_sec} (issue #14, corrected #42) is the threshold
-\code{\link[=find_rally_splits]{find_rally_splits()}} uses to propose a split of an over-long,
-\code{pid}-grouped rally at a pause independently plausible as a real break in
-play.
+\code{max_stroke_gap_sec} is the pause, in seconds, that \code{\link[=find_rally_splits]{find_rally_splits()}}
+treats as a rally boundary. It is a \emph{named list}, one entry per regime in
+\code{pause_split_regimes} (cross-court drills 3 s, net-volley 2 s; mini-tennis
+is never pause-split), looked up via \code{\link[=rally_split_gap_sec]{rally_split_gap_sec()}}. A gap must be
+strictly greater than the threshold to split. There is no \code{default}.
 
-\strong{A threshold above the observed maximum is not a threshold.} It was set
-to 8s on the reasoning that the largest gap actually seen was 5s, so 8
-sat "comfortably above" it. That made the gap pass structurally incapable
-of ever firing: measured across the current \code{shot_detail}, 9,666
-within-rally gaps run 1s (median) / 4s (p99) / 5s (max), with \strong{zero} at
-or above 6s. Every rally therefore fell through to the forced pass, and
-\code{split_method == "gap_threshold"} could never appear in any output. A
-check whose result cannot vary with its input is not a check
-(\code{checks-must-distinguish-unknown}).
+\code{split_requires_starter_next} (logical): a pause only counts as a rally
+boundary when the stroke after it is the rally starter's (the feeder, the
+\code{"host"} side by default; see the \code{rally_starter} argument of
+\code{\link[=dq_corrected_rallies]{dq_corrected_rallies()}}), because the feeder starts every rally; a long
+gap before the other player's stroke is a missed stroke, not a new rally.
+Set \code{FALSE} to let the pause alone decide.
 
-Set to \strong{4s}, inside the observed range: 176 of 9,666 gaps (1.8\%) reach
-it. The domain reasoning is the user's and is the right kind: during
-cooperative drills a pause of more than about 3-4 seconds is far more
-likely to be a new rally starting than a continuing point. Timestamps
-have 1-second resolution, so gaps are integers and this must stay an
-integer to mean what it says.
+\strong{A threshold above the observed maximum is not a threshold.} If it sits
+above every within-rally gap actually seen, the pause rule can never fire
+and the check cannot vary with its input. Each pause threshold must lie
+inside the observed gap distribution (\code{\link[=dq_stroke_gaps]{dq_stroke_gaps()}}); re-derive it
+from that distribution when sessions accumulate, and do not raise it just
+to silence splits.
 
-\strong{Constraint for any future recalibration:} the value must lie inside
-the observed gap distribution (\code{dq_stroke_gaps()}), and setting it above
-the observed maximum is a defect, not a conservative choice. Re-derive it
-from the distribution when sessions accumulate; do not raise it to
-silence splits.
+\code{max_individual_stroke_speed_kmh} (160) flags a rally holding a single
+implausibly fast stroke that the mean-speed check
+(\code{max_mean_stroke_speed_kmh}) dilutes away: one 190 km/h stroke among
+four 50 km/h strokes averages 78 km/h and passes the mean check. It sits
+above any plausible recreational stroke and well below tracking
+artefacts; recalibrate it from the per-rally maximum speed distribution
+as sessions accumulate.
+
+\code{min_segment_duration_min} (3) is the shortest same-regime run of bins
+\code{\link[=segment_session_shots]{segment_session_shots()}} accepts as a real drill instance; a shorter run
+is a mis-segmentation artefact and is relabelled \code{"gap"}. It is distinct
+from the per-bin \code{min_shots_per_bin}, which filters single one-minute bins
+before they are merged.
 }
