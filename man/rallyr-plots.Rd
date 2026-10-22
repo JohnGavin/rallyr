@@ -12,7 +12,8 @@
 plot_session_trend(
   derived,
   date_range = NULL,
-  metrics = c("accuracy", "stroke_rate", "speed")
+  metrics = c("accuracy", "stroke_rate", "speed"),
+  newest_left = FALSE
 )
 
 plot_rally_length(derived)
@@ -31,6 +32,10 @@ range are drawn. \code{NULL} (default) draws all of them.}
 
 \item{metrics}{For \code{plot_session_trend()}: which of the metric keys from
 \code{\link[=session_standard_metrics]{session_standard_metrics()}} to draw.}
+
+\item{newest_left}{For \code{plot_session_trend()}, the only chart with a time
+axis: \code{FALSE} (default) draws the oldest session on the left; \code{TRUE} draws
+the newest on the left. The axis is labelled with dates either way.}
 }
 \value{
 A \code{ggplot} object.

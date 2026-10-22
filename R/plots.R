@@ -22,6 +22,9 @@
 #'   range are drawn. `NULL` (default) draws all of them.
 #' @param metrics For `plot_session_trend()`: which of the metric keys from
 #'   [session_standard_metrics()] to draw.
+#' @param newest_left For `plot_session_trend()`, the only chart with a time
+#'   axis: `FALSE` (default) draws the oldest session on the left; `TRUE` draws
+#'   the newest on the left. The axis is labelled with dates either way.
 #' @return A `ggplot` object.
 #' @name rallyr-plots
 NULL
@@ -84,9 +87,16 @@ plot_colours <- c(me = "#0072B2", feeder = "#E69F00")
 
 #' @rdname rallyr-plots
 #' @export
-plot_session_trend <- function(derived, date_range = NULL, metrics = c("accuracy", "stroke_rate", "speed")) {
+plot_session_trend <- function(derived, date_range = NULL, metrics = c("accuracy", "stroke_rate", "speed"),
+                               newest_left = FALSE) {
   plot_need_ggplot2()
   plot_derived_ok(derived)
+  if (!is.logical(newest_left) || length(newest_left) != 1L || is.na(newest_left)) {
+    cli::cli_abort(c(
+      "x" = "{.arg newest_left} must be {.code TRUE} or {.code FALSE}.",
+      "i" = "Got {.cls {class(newest_left)[1]}} of length {length(newest_left)}."
+    ))
+  }
   title <- "Session trends"
   sm <- derived$session_metrics
   if (is.null(sm)) {
@@ -105,12 +115,32 @@ plot_session_trend <- function(derived, date_range = NULL, metrics = c("accuracy
     return(plot_empty(title, "No sessions in this date range."))
   }
   sm$panel <- factor(sprintf("%s (%s)", sm$label, sm$unit), levels = unique(sprintf("%s (%s)", sm$label, sm$unit)))
-  ggplot2::ggplot(sm, ggplot2::aes(x = .data$session_date, y = .data$value)) +
+  p <- ggplot2::ggplot(sm, ggplot2::aes(x = .data$session_date, y = .data$value)) +
     ggplot2::geom_line(colour = plot_colours[["me"]], linewidth = 0.6) +
     ggplot2::geom_point(colour = plot_colours[["me"]], size = 2.2) +
     ggplot2::facet_wrap(ggplot2::vars(.data$panel), scales = "free_y", ncol = 1) +
     ggplot2::labs(title = title, x = NULL, y = NULL) +
     plot_theme()
+  if (newest_left) p <- p + plot_reversed_date_axis()
+  p
+}
+
+# A date axis that runs newest-to-oldest. The dates are plotted as their
+# negated day numbers (a date scale cannot be reversed in every ggplot2
+# version) and the axis is labelled with the dates they stand for.
+plot_reversed_date_axis <- function() {
+  as_date <- function(minus_days) as.Date(-minus_days, origin = "1970-01-01")
+  list(
+    ggplot2::aes(x = -as.numeric(.data$session_date)),
+    ggplot2::scale_x_continuous(
+      breaks = function(limits) {
+        d <- as_date(limits[2:1])
+        b <- pretty(d, n = 5)
+        -as.numeric(b[b >= d[1] & b <= d[2]])
+      },
+      labels = function(breaks) format(as_date(breaks), "%d %b %Y")
+    )
+  )
 }
 
 #' @rdname rallyr-plots

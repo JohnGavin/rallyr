@@ -545,11 +545,15 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
   candidates <- rallies_flagged |>
     dplyr::filter(is.na(flag_reason) | grepl("strokes", flag_reason))
 
+  # One split of the shots by rally, instead of one full-table filter per rally.
+  by_rally <- split(
+    seq_len(nrow(shot_detail)),
+    paste(shot_detail$match_id, shot_detail$rally_id, sep = "|")
+  )
   split_pieces <- Map(
     function(mid, rid, regime, regime_occurrence, segment_index) {
-      shots <- shot_detail |>
-        dplyr::filter(match_id == mid, rally_id == rid) |>
-        dplyr::arrange(started_at)
+      shots <- shot_detail[by_rally[[paste(mid, rid, sep = "|")]], ]
+      shots <- shots[order(shots$started_at), ]
 
       splits <- rally_pause_splits(shots, regime, params, rally_starter)
       if (length(splits) == 0L) {
@@ -560,7 +564,9 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
       sub_rows <- lapply(seq_len(length(bounds) - 1L), function(k) {
         sub_shots <- shots[(bounds[k] + 1L):bounds[k + 1L], ]
         sub_me    <- sub_shots[sub_shots$player %in% me_side, ]
-        tibble::tibble(
+        # new_tibble(): same one-row tibble as tibble(), without its per-call
+        # name checking (this runs once per sub-rally).
+        tibble::new_tibble(list(
           match_id          = mid,
           rally_id          = sprintf("%s_%s", rid, rally_piece_suffix(k)),
           regime            = regime,
@@ -573,7 +579,7 @@ dq_corrected_rallies <- function(rallies, shot_detail, params = dq_params(),
           end_time          = max(sub_shots$started_at),
           speed_kmh         = if (nrow(sub_me) > 0L) mean(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_,
           max_speed_kmh     = if (nrow(sub_me) > 0L && !all(is.na(sub_me$shot_speed_mph))) max(sub_me$shot_speed_mph, na.rm = TRUE) * 1.609344 else NA_real_
-        )
+        ), nrow = 1L)
       })
       dplyr::bind_rows(sub_rows)
     },

@@ -42,6 +42,26 @@ sample_path <- local({
 sample_bundle <- bundle_read(sample_path)
 sample_player <- "Sample Player"
 
+# The extra synthetic session (three raw JSON files) offered for download, so a
+# visitor can try "add a session" on top of the sample bundle.
+sample_session_dir <- local({
+  bundled <- file.path(app_dir, "data", "synthetic_sample_session")
+  if (dir.exists(bundled)) bundled else system.file("extdata", "synthetic_sample_session", package = rallyr_pkg)
+})
+sample_session_files <- c(
+  match = "sample_session_match.json", stats = "sample_session_stats.json", shots = "sample_session_shots.json"
+)
+
+# The sample's tables and derived data, computed once when the app was built
+# (tools/build_app.R) so the page does not parse six sessions in the browser.
+# NULL when running from the installed package (development): the sample is then
+# derived live, like any bundle the visitor supplies.
+sample_pre <- local({
+  f <- file.path(app_dir, "data", "sample_derived.rds")
+  pre <- if (file.exists(f)) tryCatch(readRDS(f), error = function(e) NULL) else NULL
+  if (is.list(pre) && identical(pre$me, sample_player)) pre else NULL
+})
+
 token_ok <- function(x) nzchar(x) && grepl("^[A-Za-z0-9._~-]+$", x)
 
 # Message text of an error, without formatting.
@@ -91,6 +111,15 @@ ui <- bslib::page_sidebar(
     fileInput("raw_files", "Drop the saved JSON files", multiple = TRUE, accept = ".json",
               buttonLabel = "Choose files", placeholder = "the match, stats and shots files"),
     tableOutput("raw_detect"),
+    tags$h6(class = "mt-3", "Try it with sample files"),
+    tags$p(class = "small text-body-secondary mb-1",
+           "Download, then choose them in step 1 and step 2. All synthetic."),
+    tags$div(class = "d-flex flex-wrap gap-1",
+      downloadButton("dl_sample_bundle", "Sample bundle", class = "btn-sm btn-outline-secondary"),
+      downloadButton("dl_sample_match", "Extra session: match", class = "btn-sm btn-outline-secondary"),
+      downloadButton("dl_sample_stats", "stats", class = "btn-sm btn-outline-secondary"),
+      downloadButton("dl_sample_shots", "shots", class = "btn-sm btn-outline-secondary")
+    ),
     tags$hr(),
     tags$h6("3. Who you are"),
     selectizeInput("me", NULL, choices = c(sample_player), selected = sample_player,
@@ -109,6 +138,9 @@ ui <- bslib::page_sidebar(
                   min = as.Date("2000-01-01"), max = as.Date("2000-01-02"),
                   value = c(as.Date("2000-01-01"), as.Date("2000-01-02")),
                   timeFormat = "%d %b %Y", width = "100%"),
+      radioButtons("axis_dir", "Time axis", inline = TRUE,
+                   choices = c("Oldest on the left" = "old", "Newest on the left" = "new"),
+                   selected = "old"),
       bslib::layout_columns(
         col_widths = c(12, 6, 6, 6, 6),
         bslib::card(bslib::card_header("Session trends"), plotOutput("plot_trend", height = "420px"),
@@ -269,22 +301,49 @@ server <- function(input, output, session) {
     contentType = "application/gzip"
   )
 
-  # ---- computing, one session per browser round trip ----------------------
-  # Each step is one session; the browser answers between steps, so the page
-  # stays responsive and the status line updates (a long loop would freeze it).
+  # ---- sample files to download --------------------------------------------
+  sample_download <- function(path_fn, name, type) {
+    downloadHandler(
+      filename = function() name,
+      content = function(file) file.copy(path_fn(), file, overwrite = TRUE),
+      contentType = type
+    )
+  }
+  output$dl_sample_bundle <- sample_download(
+    function() sample_path, "rallyr_sample_bundle.json.gz", "application/gzip"
+  )
+  for (kind in names(sample_session_files)) {
+    local({
+      k <- kind
+      output[[paste0("dl_sample_", k)]] <- sample_download(
+        function() file.path(sample_session_dir, sample_session_files[[k]]),
+        sample_session_files[[k]], "application/json"
+      )
+    })
+  }
+
+  # ---- computing -------------------------------------------------------------
+  # The built-in sample is precomputed (sample_pre), so it needs no waiting. A
+  # bundle the visitor supplies is read one session per browser round trip: the
+  # browser answers between steps, so the page stays responsive and the status
+  # line updates (a long loop would freeze it).
   me <- reactive(trimws(input$me %||% ""))
+  use_sample_pre <- reactive(
+    !is.null(sample_pre) && source_kind() == "sample" && identical(me(), sample_player)
+  )
 
   observe({
     b <- bundle()
     m <- me()
+    pre <- use_sample_pre()
     isolate({
-      prime$ready <- FALSE
+      prime$ready <- pre
       prime$me <- m
       prime$done <- 0L
-      prime$todo <- if (nzchar(m)) seq_along(b$sessions) else integer(0)
+      prime$todo <- if (nzchar(m) && !pre) seq_along(b$sessions) else integer(0)
       prime$total <- length(prime$todo)
     })
-    if (nzchar(m)) session$sendCustomMessage("rallyr_tick", list())
+    if (nzchar(m) && !pre) session$sendCustomMessage("rallyr_tick", list())
   })
 
   observeEvent(input$tick, {
@@ -305,6 +364,7 @@ server <- function(input, output, session) {
   tables <- reactive({
     validate(need(nzchar(me()), "Enter your player name in step 3 to draw the charts."))
     validate(need(prime$ready, "Reading sessions..."))
+    if (use_sample_pre()) return(sample_pre$tables)
     bundle_to_tables(bundle(), me(), on_error = "skip", cache = cache)
   })
 
@@ -315,7 +375,7 @@ server <- function(input, output, session) {
       paste0("No session has a player called \"", me(), "\". Names in this bundle: ",
              paste(bundle_players(bundle()), collapse = ", "), ".")
     ))
-    bundle_derived(t)
+    if (use_sample_pre()) sample_pre$derived else bundle_derived(t)
   })
 
   output$status <- renderUI({
@@ -346,7 +406,8 @@ server <- function(input, output, session) {
   # ---- outputs ------------------------------------------------------------
   draw <- function(fn, ...) renderPlot(fn(derived(), ...), bg = "transparent", res = 96)
   output$plot_trend <- renderPlot(
-    plot_session_trend(derived(), date_range = input$range), bg = "transparent", res = 96
+    plot_session_trend(derived(), date_range = input$range, newest_left = identical(input$axis_dir, "new")),
+    bg = "transparent", res = 96
   )
   output$plot_rally <- draw(plot_rally_length)
   output$plot_speed <- draw(plot_stroke_speed)

@@ -18,6 +18,17 @@ First public release (version bumped for the first deployed site).
 
 ## New
 
+* Reading a bundle is about 7 times faster (`sv_parse_shots()` builds each
+  column once instead of one tibble per shot; `dq_corrected_rallies()` splits
+  the shots by rally once). Results are identical. The browser app shows its
+  synthetic sample from tables precomputed at build time, so it no longer waits
+  for six sessions to be read.
+* `plot_session_trend(newest_left = )` draws the newest session on the left;
+  the app has a "Time axis" choice for it.
+* An extra synthetic session as raw JSON files
+  (`inst/extdata/synthetic_sample_session/`, made by
+  `data-raw/generate_sample_session.R`), also offered for download, with the
+  sample bundle, on the app page.
 * `rally_stroke_threshold()`, `rally_split_gap_sec()`,
   `rally_player_strokes()`, `find_rally_splits(is_starter = )`; the
   `me_side` and `rally_starter` arguments of `dq_corrected_rallies()`.

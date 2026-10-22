@@ -21,6 +21,15 @@ test_that("the app works in a clean process from the assembled folder (bundled c
     stdout = TRUE, stderr = TRUE
   ))
   expect_true(file.exists(file.path(app, "pkg_R", "rallyr_app_sources.R")), info = paste(out, collapse = "\n"))
+  # the sample files the page offers, and the precomputed sample
+  expect_setequal(
+    list.files(file.path(app, "data", "synthetic_sample_session")),
+    list.files(system.file("extdata", "synthetic_sample_session", package = "rallyr"))
+  )
+  expect_true(file.exists(file.path(app, "data", "synthetic_sample_bundle.json.gz")))
+  pre <- readRDS(file.path(app, "data", "sample_derived.rds"))
+  expect_identical(pre$me, "Sample Player")
+  expect_equal(nrow(pre$derived$sessions), 6L)
   res <- suppressWarnings(system2(
     rscript,
     c(shQuote(normalizePath(test_path("app-sourced-driver.R"))), shQuote(app),

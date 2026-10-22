@@ -211,39 +211,53 @@ sv_parse_shots <- function(shots) {
     ))
   }
 
-  rows <- lapply(shots, function(sh) {
-    tibble::tibble(
-      match_id       = sv_num(sh$match_id),
-      shot_id        = sv_num(sh$id),
-      rally_id       = sv_num(sh$pid),
-      player         = sv_chr(sh$player),
-      started_at     = sv_time(sh$started_at),
-      ended_at       = sv_time(sh$ended_at),
-      hit_wing       = sv_chr(sh$hit_wing),
-      hit_type       = sv_chr(sh$hit_type),
-      spin_type      = sv_chr(sh$spin_type),
-      shot_speed_mph = sv_speed_mph(sh$hit_velocity),
-      shot_in        = sv_shot_in(sh$net_type, sh$bounce_location_long, sh$bounce_location_lat),
-      hit_frame            = sv_num(sh$hit_frame),
-      video_elapsed_sec    = sv_video_elapsed_sec(sh$hit_frame),
-      hit_court_side       = sv_chr(sh$hit_court_side),
-      bounce_court_side    = sv_chr(sh$bounce_court_side),
-      net_clearance_m      = sv_net_clearance_m(sh$net_location),
-      bounce_location_long = sv_chr(sh$bounce_location_long),
-      bounce_location_lat  = sv_chr(sh$bounce_location_lat),
-      hit_x    = sv_component(sh$hit_location, 1L),
-      hit_y    = sv_component(sh$hit_location, 2L),
-      hit_z    = sv_component(sh$hit_location, 3L),
-      bounce_x = sv_component(sh$bounce_location, 1L),
-      bounce_y = sv_component(sh$bounce_location, 2L),
-      bounce_z = sv_component(sh$bounce_location, 3L),
-      hit_velocity_x = sv_component(sh$hit_velocity, 1L),
-      hit_velocity_y = sv_component(sh$hit_velocity, 2L),
-      hit_velocity_z = sv_component(sh$hit_velocity, 3L)
-    )
-  })
+  # Each column is built once across all shots (one tibble, not one per shot:
+  # that was the dominant cost of reading a bundle). The per-field coercers are
+  # the same ones as before, so the result is unchanged.
+  num <- function(f) vapply(shots, function(sh) sv_num(f(sh)), numeric(1))
+  chr <- function(f) vapply(shots, function(sh) sv_chr(f(sh)), character(1))
+  comp <- function(field, i) vapply(shots, function(sh) sv_component(sh[[field]], i), numeric(1))
+  tim <- function(field) {
+    txt <- vapply(shots, function(sh) {
+      v <- sh[[field]]
+      if (is.null(v)) NA_character_ else as.character(v)
+    }, character(1))
+    as.POSIXct(txt, format = "%Y-%m-%dT%H:%M:%OSZ", tz = "UTC")
+  }
+  hit_frame <- num(function(sh) sh$hit_frame)
 
-  dplyr::bind_rows(rows) |> dplyr::arrange(started_at)
+  out <- tibble::tibble(
+    match_id       = num(function(sh) sh$match_id),
+    shot_id        = num(function(sh) sh$id),
+    rally_id       = num(function(sh) sh$pid),
+    player         = chr(function(sh) sh$player),
+    started_at     = tim("started_at"),
+    ended_at       = tim("ended_at"),
+    hit_wing       = chr(function(sh) sh$hit_wing),
+    hit_type       = chr(function(sh) sh$hit_type),
+    spin_type      = chr(function(sh) sh$spin_type),
+    shot_speed_mph = vapply(shots, function(sh) sv_speed_mph(sh$hit_velocity), numeric(1)),
+    shot_in        = vapply(shots, function(sh) {
+      sv_shot_in(sh$net_type, sh$bounce_location_long, sh$bounce_location_lat)
+    }, logical(1)),
+    hit_frame            = hit_frame,
+    video_elapsed_sec    = hit_frame / sv_fps(),
+    hit_court_side       = chr(function(sh) sh$hit_court_side),
+    bounce_court_side    = chr(function(sh) sh$bounce_court_side),
+    net_clearance_m      = comp("net_location", 3L),
+    bounce_location_long = chr(function(sh) sh$bounce_location_long),
+    bounce_location_lat  = chr(function(sh) sh$bounce_location_lat),
+    hit_x    = comp("hit_location", 1L),
+    hit_y    = comp("hit_location", 2L),
+    hit_z    = comp("hit_location", 3L),
+    bounce_x = comp("bounce_location", 1L),
+    bounce_y = comp("bounce_location", 2L),
+    bounce_z = comp("bounce_location", 3L),
+    hit_velocity_x = comp("hit_velocity", 1L),
+    hit_velocity_y = comp("hit_velocity", 2L),
+    hit_velocity_z = comp("hit_velocity", 3L)
+  )
+  dplyr::arrange(out, started_at)
 }
 
 #' Derive whether a shot landed in play from net/bounce fields

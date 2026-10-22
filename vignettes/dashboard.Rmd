@@ -63,6 +63,8 @@ plot_session_trend(derived)
   higher just for being long.
 - In the app a range slider limits this chart; it starts on the last three
   months.
+- The oldest session is on the left. `plot_session_trend(derived, newest_left = TRUE)`
+  (the app's "Newest on the left" choice) puts the newest there.
 
 ## Rally length by drill
 
@@ -107,6 +109,30 @@ plot_gap_distribution(derived)
 - A threshold must sit inside the pauses actually seen. One above every
   observed pause could never split anything, and the check would pass
   without checking.
+
+## Try it with the sample files
+
+Two synthetic files are shipped, to try the steps below without any data of
+your own:
+
+- the **sample bundle**, `inst/extdata/synthetic_sample_bundle.json.gz` (six
+  sessions);
+- one **extra session**, not in that bundle, as the three raw JSON files a
+  saved share link gives (`inst/extdata/synthetic_sample_session/`).
+
+Both are also on the app page ("Try it with sample files"), to download and
+then choose in step 1 and step 2. In R, add the extra session to the sample
+bundle:
+
+```{r extra}
+extra <- list.files(
+  system.file("extdata", "synthetic_sample_session", package = "rallyr"),
+  full.names = TRUE
+)
+seven <- bundle_add_raw(bundle, extra[1], extra[2], extra[3])
+seven
+attr(seven, "merge_report")$action
+```
 
 ## Use your own sessions
 
