@@ -68,6 +68,12 @@ test_that("the committed files are what the generator makes (not hand-edited)", 
   fresh <- env$.write_extra_session(env$.synthetic_extra_session(), dir)
   for (p in fresh) {
     committed <- system.file("extdata", "synthetic_sample_session", basename(p), package = "rallyr")
-    expect_identical(readLines(p, warn = FALSE), readLines(committed, warn = FALSE), info = basename(p))
+    # Not byte-identical: the files hold full-precision doubles (15 significant
+    # digits) from a seeded RNG, and the last digit can differ between
+    # platforms' libm (macOS vs Linux CI). Compare the parsed content with a
+    # tight tolerance: a hand edit (name, count, value) still fails.
+    fresh_json <- jsonlite::fromJSON(p, simplifyVector = FALSE)
+    committed_json <- jsonlite::fromJSON(committed, simplifyVector = FALSE)
+    expect_equal(fresh_json, committed_json, tolerance = 1e-10, info = basename(p))
   }
 })
