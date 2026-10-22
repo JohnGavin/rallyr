@@ -40,9 +40,18 @@ run_app_checks <- function(app_dir) {
       session$setInputs(tick = k)
       if (prime$ready) break
     }
-    stopifnot("sample was not read in steps" = isTRUE(prime$ready), prime$total == 6L)
+    # In the built app the sample is precomputed and needs no reading steps;
+    # run from the installed package it is read live, in six steps.
+    precomputed <- file.exists(file.path(app_dir, "data", "sample_derived.rds"))
+    stopifnot(
+      "sample was not ready" = isTRUE(prime$ready),
+      "wrong number of reading steps" = prime$total == if (precomputed) 0L else 6L
+    )
     d <- derived()
     stopifnot(nrow(d$sessions) == 6L, !is.null(d$session_metrics), nrow(d$corrected_rallies) > 0L)
+    # the shown sample is exactly what deriving it live gives
+    live <- bundle_derived(bundle_to_tables(sample, "Sample Player"))
+    stopifnot("the sample's derived data differ from a live computation" = identical(d, live))
     # every plot renders (a plot that errors has no `src`)
     for (id in c("plot_trend", "plot_rally", "plot_speed", "plot_net", "plot_gap")) {
       stopifnot(
@@ -50,6 +59,25 @@ run_app_checks <- function(app_dir) {
         "a plot reported an error" = is.null(output[[id]]$error)
       )
     }
+
+    # 1b. The time axis can be flipped, and the chart still renders.
+    session$setInputs(axis_dir = "new")
+    stopifnot("flipped chart did not render" = !is.null(output$plot_trend$src), is.null(output$plot_trend$error))
+    session$setInputs(axis_dir = "old")
+
+    # 1c. The sample files can be downloaded and are what the app accepts.
+    dl_bundle <- output$dl_sample_bundle
+    stopifnot("sample bundle download is not the sample" = length(bundle_read(dl_bundle)$sessions) == 6L)
+    dl_kinds <- vapply(
+      c("dl_sample_match", "dl_sample_stats", "dl_sample_shots"),
+      function(id) bundle_payload_kind(output[[id]]), character(1), USE.NAMES = FALSE
+    )
+    stopifnot("extra session downloads are not match, stats and shots" = identical(dl_kinds, c("match", "stats", "shots")))
+    extra <- do.call(bundle_add_raw, c(
+      list(sample),
+      lapply(c("dl_sample_match", "dl_sample_stats", "dl_sample_shots"), function(id) output[[id]])
+    ))
+    stopifnot("the extra session did not give 7 sessions" = length(extra$sessions) == 7L)
 
     # 2. A name that is not in the data gives a message, not a crash.
     session$setInputs(me = "Nobody At All")

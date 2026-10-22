@@ -128,7 +128,27 @@ The app at <https://johngavin.github.io/rallyr/app/> runs R in your browser
 3. Enter your name, add the session (same `match_id`: the newer copy
    replaces the old, and a merge report says what happened) and download the
    updated bundle.
-4. The charts are recomputed in the browser with rallyr's own functions.
+4. The charts are recomputed in the browser with rallyr's own functions. A
+   choice above the trend chart puts the oldest session on the left (the
+   default) or the newest.
+
+To try the steps without data of your own, two synthetic sets of sample files
+ship with the package and are offered for download on the app page ("Try it
+with sample files"):
+
+- `inst/extdata/synthetic_sample_bundle.json.gz`: the sample bundle (six
+  sessions), for step 1;
+- `inst/extdata/synthetic_sample_session/`: one extra session that is not in
+  that bundle, as its three raw JSON files (match, stats, shots), for step 2.
+
+```r
+extra <- list.files(
+  system.file("extdata", "synthetic_sample_session", package = "rallyr"),
+  full.names = TRUE
+)
+bundle <- bundle_read(system.file("extdata", "synthetic_sample_bundle.json.gz", package = "rallyr"))
+bundle <- bundle_add_raw(bundle, extra[1], extra[2], extra[3])   # now 7 sessions
+```
 
 Privacy: files you choose are read in the browser and are not uploaded. The
 app makes no requests to other sites (no analytics, proxy, fonts or scripts

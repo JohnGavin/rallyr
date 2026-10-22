@@ -6,7 +6,9 @@
 #
 # 1. Assembles an app folder (default: a fresh folder under tempdir(), NOT
 #    inside the repository): app.R, the package code the app can reach
-#    (pkg_R/, see tools/app_sources.R) and the synthetic sample bundle (data/).
+#    (pkg_R/, see tools/app_sources.R), and data/: the synthetic sample bundle,
+#    the extra synthetic session's JSON files (offered for download) and the
+#    sample's precomputed tables (sample_derived.rds, see below).
 #    It must stay outside the repository: shinylive finds the packages to
 #    bundle with renv::dependencies(), which skips anything the repository's
 #    .gitignore lists, so an app folder under a git-ignored name is scanned as
@@ -37,9 +39,37 @@ invisible(file.copy(
   file.path(root, "inst", "extdata", "synthetic_sample_bundle.json.gz"),
   file.path(app_build, "data", "synthetic_sample_bundle.json.gz")
 ))
+# The extra synthetic session (three raw JSON files) the app offers for download.
+dir.create(file.path(app_build, "data", "synthetic_sample_session"))
+extra_files <- list.files(file.path(root, "inst", "extdata", "synthetic_sample_session"), full.names = TRUE)
+if (length(extra_files) == 0L) stop("inst/extdata/synthetic_sample_session/ holds no files.", call. = FALSE)
+invisible(file.copy(extra_files, file.path(app_build, "data", "synthetic_sample_session")))
 written <- app_write_sources(
   file.path(root, "R"), file.path(app_build, "pkg_R", "rallyr_app_sources.R")
 )
+
+# 2b. The synthetic sample's tables and derived data, computed here once with
+#     the same bundled code the browser runs, so the page shows the sample
+#     without parsing six sessions in WebAssembly (about 20x slower than native
+#     R). Only the sample is precomputed: a bundle the visitor supplies is
+#     always derived live. The player's name is read from app.R, its one home.
+app_lines <- readLines(file.path(app_build, "app.R"), warn = FALSE)
+name_line <- grep('^sample_player <- "[^"]+"\\s*$', app_lines, value = TRUE)
+if (length(name_line) != 1L) stop("Could not read `sample_player` from app.R.", call. = FALSE)
+sample_me <- sub('^sample_player <- "([^"]+)"\\s*$', "\\1", name_line)
+local({
+  e <- new.env(parent = globalenv())
+  e$.data <- rlang::.data
+  source(file.path(app_build, "pkg_R", "rallyr_app_sources.R"), local = e)
+  tables <- e$bundle_to_tables(
+    e$bundle_read(file.path(app_build, "data", "synthetic_sample_bundle.json.gz")),
+    sample_me
+  )
+  saveRDS(
+    list(me = sample_me, tables = tables, derived = e$bundle_derived(tables)),
+    file.path(app_build, "data", "sample_derived.rds")
+  )
+})
 message(sprintf("Assembled %s with %d package definitions.", app_build, length(written)))
 if (assemble_only) quit(status = 0)
 
