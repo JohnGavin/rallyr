@@ -23,7 +23,9 @@ rix(
   overwrite = TRUE,
   r_pkgs = r_pkgs,
   # pandoc: rmarkdown needs it to build the vignette in R CMD check.
-  system_pkgs = "pandoc",
+  # nodejs: the browser app is plain JavaScript; the tests that compare it with
+  # the R functions (tests/testthat/test-js_parity.R) run it with node.
+  system_pkgs = c("pandoc", "nodejs"),
   ide = "none"
 )
 

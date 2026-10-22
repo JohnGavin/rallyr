@@ -1,122 +1,85 @@
 #!/usr/bin/env Rscript
 
-# Build the browser app.
+# Build the browser app into the site.
 #
-#   Rscript tools/build_app.R [site_dir] [--assemble-only] [--app-dir=<dir>]
+#   Rscript tools/build_app.R [site_dir]        (default: _site)
 #
-# 1. Assembles an app folder (default: a fresh folder under tempdir(), NOT
-#    inside the repository): app.R, the package code the app can reach
-#    (pkg_R/, see tools/app_sources.R), and data/: the synthetic sample bundle,
-#    the extra synthetic session's JSON files (offered for download) and the
-#    sample's precomputed tables (sample_derived.rds, see below).
-#    It must stay outside the repository: shinylive finds the packages to
-#    bundle with renv::dependencies(), which skips anything the repository's
-#    .gitignore lists, so an app folder under a git-ignored name is scanned as
-#    empty, no WebAssembly packages are bundled and the page then downloads them
-#    from another site at run time.
-# 2. Exports it with shinylive into <site_dir>/app (default _site/), the
-#    Shinylive runtime and the WebAssembly R packages it needs being copied
-#    next to it, so the page loads nothing from other sites.
-# 3. Adds the Content-Security-Policy (inst/app/csp.txt) to the exported pages.
+# The app is plain JavaScript (inst/app_js/): no WebAssembly, no R at run time,
+# no framework, nothing fetched from another site. This script copies it to
+# <site_dir>/app/ and adds one generated file, js/sample_data.js: the synthetic
+# sample bundle and the extra session's three JSON files, written into a
+# script so the page can show the sample and offer the files without making a
+# request (a request of any kind is what the privacy checks look for).
 #
-# --assemble-only stops after step 1 (used where shinylive is not installed).
+# The sample data have one home, inst/extdata/. The generated file is derived
+# from it on every build and is never committed.
+#
+# Exit codes: 0 built, 1 something that must be there is not, 2 usage.
 
-args <- commandArgs(trailingOnly = TRUE)
-assemble_only <- "--assemble-only" %in% args
-pos <- args[!startsWith(args, "--")]
-site_dir <- if (length(pos) >= 1L) pos[1] else "_site"
+# The files of the app, relative to inst/app_js: the page, its style, its code.
+app_js_files <- function(root) {
+  src <- file.path(root, "inst", "app_js")
+  files <- c("index.html", "app.css", file.path("js", sort(list.files(file.path(src, "js"), pattern = "\\.js$"))))
+  files[files != file.path("js", "sample_data.js")]
+}
 
-self <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
-root <- normalizePath(file.path(dirname(self), ".."))
-source(file.path(root, "tools", "app_sources.R"))
-
-app_dir_arg <- sub("^--app-dir=", "", grep("^--app-dir=", args, value = TRUE))
-app_build <- if (length(app_dir_arg) == 1L) normalizePath(app_dir_arg, mustWork = FALSE) else file.path(tempdir(), "rallyr_app")
-if (dir.exists(app_build)) unlink(app_build, recursive = TRUE)
-dir.create(file.path(app_build, "data"), recursive = TRUE)
-invisible(file.copy(file.path(root, "inst", "app", "app.R"), file.path(app_build, "app.R")))
-invisible(file.copy(
-  file.path(root, "inst", "extdata", "synthetic_sample_bundle.json.gz"),
-  file.path(app_build, "data", "synthetic_sample_bundle.json.gz")
-))
-# The extra synthetic session (three raw JSON files) the app offers for download.
-dir.create(file.path(app_build, "data", "synthetic_sample_session"))
-extra_files <- list.files(file.path(root, "inst", "extdata", "synthetic_sample_session"), full.names = TRUE)
-if (length(extra_files) == 0L) stop("inst/extdata/synthetic_sample_session/ holds no files.", call. = FALSE)
-invisible(file.copy(extra_files, file.path(app_build, "data", "synthetic_sample_session")))
-written <- app_write_sources(
-  file.path(root, "R"), file.path(app_build, "pkg_R", "rallyr_app_sources.R")
-)
-
-# 2b. The synthetic sample's tables and derived data, computed here once with
-#     the same bundled code the browser runs, so the page shows the sample
-#     without parsing six sessions in WebAssembly (about 20x slower than native
-#     R). Only the sample is precomputed: a bundle the visitor supplies is
-#     always derived live. The player's name is read from app.R, its one home.
-app_lines <- readLines(file.path(app_build, "app.R"), warn = FALSE)
-name_line <- grep('^sample_player <- "[^"]+"\\s*$', app_lines, value = TRUE)
-if (length(name_line) != 1L) stop("Could not read `sample_player` from app.R.", call. = FALSE)
-sample_me <- sub('^sample_player <- "([^"]+)"\\s*$', "\\1", name_line)
-local({
-  e <- new.env(parent = globalenv())
-  e$.data <- rlang::.data
-  source(file.path(app_build, "pkg_R", "rallyr_app_sources.R"), local = e)
-  tables <- e$bundle_to_tables(
-    e$bundle_read(file.path(app_build, "data", "synthetic_sample_bundle.json.gz")),
-    sample_me
+# The text of js/sample_data.js, made from the sample files under inst/extdata.
+app_js_sample_data <- function(root) {
+  ext <- file.path(root, "inst", "extdata")
+  bundle <- file.path(ext, "synthetic_sample_bundle.json.gz")
+  session_dir <- file.path(ext, "synthetic_sample_session")
+  parts <- c(match = "sample_session_match.json", stats = "sample_session_stats.json", shots = "sample_session_shots.json")
+  needed <- c(bundle, file.path(session_dir, parts))
+  absent <- needed[!file.exists(needed)]
+  if (length(absent) > 0L) stop("Sample files missing: ", paste(absent, collapse = ", "), call. = FALSE)
+  js_string <- function(x) as.character(jsonlite::toJSON(x, auto_unbox = TRUE))
+  b64 <- jsonlite::base64_enc(readBin(bundle, "raw", n = file.size(bundle)))
+  files <- vapply(names(parts), function(k) {
+    text <- paste(readLines(file.path(session_dir, parts[[k]]), warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+    sprintf("  %s: { name: %s, text: %s },", k, js_string(parts[[k]]), js_string(text))
+  }, character(1))
+  c(
+    "// Generated by tools/build_app.R from inst/extdata. Do not edit, do not commit.",
+    "// The synthetic sample the page opens with, and the extra session's three files it",
+    "// offers for download, as data in a script: the page makes no request for them.",
+    "",
+    sprintf("export const SAMPLE_BUNDLE_B64 = %s;", js_string(b64)),
+    "",
+    "export const SAMPLE_SESSION_FILES = {",
+    files,
+    "};",
+    ""
   )
-  saveRDS(
-    list(me = sample_me, tables = tables, derived = e$bundle_derived(tables)),
-    file.path(app_build, "data", "sample_derived.rds")
-  )
-})
-message(sprintf("Assembled %s with %d package definitions.", app_build, length(written)))
-if (assemble_only) quit(status = 0)
-
-if (!requireNamespace("shinylive", quietly = TRUE)) {
-  message("The shinylive package is not installed: cannot export (exit 3 = indeterminate).")
-  quit(status = 3)
 }
 
-dest <- normalizePath(site_dir, mustWork = FALSE)
-dir.create(dest, recursive = TRUE, showWarnings = FALSE)
-options(shinylive.quiet = FALSE)
-shinylive::export(app_build, dest, subdir = "app")
-
-# The page must not fetch packages from another site, so the WebAssembly
-# builds of every package the app's code names have to be in the export, unless
-# the Shinylive runtime already holds it. Both lists are derived, not typed:
-# the packages come from the code (tools/app_sources.R) and the runtime's own
-# list from the export. Fail the build if one is missing (the browser check
-# would fail later, with a longer log).
-meta_file <- file.path(dest, "shinylive", "webr", "packages", "metadata.rds")
-bundled <- if (file.exists(meta_file)) names(readRDS(meta_file)) else character(0)
-message("Bundled WebAssembly packages: ", if (length(bundled)) paste(sort(bundled), collapse = ", ") else "(none)")
-runtime <- app_runtime_packages(dest)
-if (is.null(runtime)) {
-  message("INDETERMINATE: cannot read the runtime's own package list under ", dest,
-          "/shinylive/webr, so cannot tell which packages must be bundled.")
-  quit(status = 3)
-}
-named <- app_package_refs(file.path(root, "R"), file.path(app_build, "app.R"))
-needed <- setdiff(named, runtime)
-message("Packages the app names: ", paste(named, collapse = ", "))
-message("Needing a WebAssembly build: ", if (length(needed)) paste(needed, collapse = ", ") else "(none)")
-if (length(needed) == 0L || !all(needed %in% bundled)) {
-  message("FAIL: not bundled: ", if (length(needed) == 0L) "(the derived list is empty, which cannot be right)" else paste(setdiff(needed, bundled), collapse = ", "),
-          ". Check the app folder ", app_build, " for what renv::dependencies() sees.")
-  quit(status = 1)
+# Copy the app into <site_dir>/app and write its sample data; returns the folder.
+build_app_js <- function(root, site_dir) {
+  src <- file.path(root, "inst", "app_js")
+  dest <- file.path(site_dir, "app")
+  if (dir.exists(dest)) unlink(dest, recursive = TRUE)
+  dir.create(file.path(dest, "js"), recursive = TRUE)
+  for (f in app_js_files(root)) {
+    if (!file.exists(file.path(src, f))) stop("The app file ", f, " is missing from inst/app_js.", call. = FALSE)
+    if (!file.copy(file.path(src, f), file.path(dest, f))) stop("Could not copy ", f, ".", call. = FALSE)
+  }
+  writeLines(app_js_sample_data(root), file.path(dest, "js", "sample_data.js"))
+  html <- paste(readLines(file.path(dest, "index.html"), warn = FALSE), collapse = "\n")
+  if (!grepl("http-equiv=\"Content-Security-Policy\"", html, fixed = TRUE)) {
+    stop("index.html has no Content-Security-Policy tag.", call. = FALSE)
+  }
+  dest
 }
 
-csp <- trimws(readLines(file.path(root, "inst", "app", "csp.txt"), warn = FALSE))
-meta <- sprintf('<meta http-equiv="Content-Security-Policy" content="%s">', csp)
-for (page in c(file.path(dest, "app", "index.html"), file.path(dest, "app", "edit", "index.html"))) {
-  if (!file.exists(page)) next
-  html <- paste(readLines(page, warn = FALSE), collapse = "\n")
-  if (grepl("Content-Security-Policy", html, fixed = TRUE)) next
-  if (!grepl("<head[^>]*>", html)) stop("No <head> found to add the CSP to in ", page, call. = FALSE)
-  html <- sub("(<head[^>]*>)", paste0("\\1\n", gsub("\\", "\\\\", meta, fixed = TRUE)), html)
-  writeLines(html, page)
-  message("Added the CSP to ", page)
+if (sys.nframe() == 0L) {
+  args <- commandArgs(trailingOnly = TRUE)
+  if (length(args) > 1L || any(startsWith(args, "--"))) {
+    message("Usage: build_app.R [site_dir]")
+    quit(status = 2)
+  }
+  self <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
+  root <- normalizePath(file.path(dirname(self), ".."))
+  site_dir <- normalizePath(if (length(args) == 1L) args[1] else "_site", mustWork = FALSE)
+  dir.create(site_dir, recursive = TRUE, showWarnings = FALSE)
+  dest <- build_app_js(root, site_dir)
+  message("Built the app in ", dest, " (", length(list.files(dest, recursive = TRUE)), " files).")
 }
-message("Exported the app to ", file.path(dest, "app"))

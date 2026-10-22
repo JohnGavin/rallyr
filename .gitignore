@@ -4,4 +4,4 @@
 _site/
 _app_build/
 docs/
-node_modules/
+node_modules
