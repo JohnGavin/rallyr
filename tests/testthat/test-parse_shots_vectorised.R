@@ -74,7 +74,10 @@ test_that("the sample's tables and derived data are identical to those of the or
   tb <- bundle_to_tables(sample_bundle(), "Sample Player")
   expect_identical(tb, ref$tables)
   d <- bundle_derived(tb)
-  expect_identical(d[setdiff(names(d), "tables")], ref$derived)
+  # The reference was saved on macOS; derived scores (z-scores, sums) can
+  # differ from Linux in the 16th significant digit, so compare with a tight
+  # tolerance. The tables above still have to be identical.
+  expect_equal(d[setdiff(names(d), "tables")], ref$derived, tolerance = 1e-12)
 })
 
 test_that("a whole sample bundle is read quickly", {
