@@ -1,0 +1,235 @@
+/* The rallyr browser app. Plain CSS, no framework, no web fonts. Colours are
+   variables so light and dark mode (the system setting, or the page's own
+   toggle) change them in one place. No inline styles anywhere: the page's
+   content-security policy does not allow them. */
+
+:root {
+  --bg: #ffffff;
+  --panel: #f6f7f9;
+  --text: #1c2129;
+  --muted: #5b6573;
+  --border: #d3d9e0;
+  --link: #0b63c4;
+  --accent: #0b63c4;
+  --accent-text: #ffffff;
+  --warn: #8a5a00;
+  --danger: #b3261e;
+  --ready: #1a7f37;
+  --chart-text: #4d5661;
+  --chart-grid: #d9dde3;
+  --c-me: #0072b2;
+  --c-feeder: #e69f00;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181d;
+    --panel: #1d232b;
+    --text: #e6e9ed;
+    --muted: #a3acb8;
+    --border: #36404c;
+    --link: #6cb2ff;
+    --accent: #3b8eea;
+    --accent-text: #0a0d11;
+    --warn: #e0b04a;
+    --danger: #ff8a80;
+    --ready: #4ccf72;
+    --chart-text: #b5bdc8;
+    --chart-grid: #38414c;
+    --c-me: #56b4e9;
+    --c-feeder: #f0b43c;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #14181d;
+  --panel: #1d232b;
+  --text: #e6e9ed;
+  --muted: #a3acb8;
+  --border: #36404c;
+  --link: #6cb2ff;
+  --accent: #3b8eea;
+  --accent-text: #0a0d11;
+  --warn: #e0b04a;
+  --danger: #ff8a80;
+  --ready: #4ccf72;
+  --chart-text: #b5bdc8;
+  --chart-grid: #38414c;
+  --c-me: #56b4e9;
+  --c-feeder: #f0b43c;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+a { color: var(--link); }
+h1 { font-size: 1.15rem; margin: 0; }
+h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+h3 { font-size: 0.92rem; margin: 1rem 0 0.35rem; }
+p { margin: 0.4rem 0; }
+ul { margin: 0.4rem 0; padding-left: 1.2rem; }
+.small { font-size: 0.85rem; }
+.muted { color: var(--muted); }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+  align-items: start;
+}
+
+.side {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.side section { border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.6rem; }
+.side p.small:first-child { margin-top: 0; }
+.side section:first-of-type { border-top: 0; padding-top: 0; }
+
+label { display: block; font-size: 0.9rem; margin: 0.3rem 0 0.15rem; }
+
+input[type="text"] {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.35rem 0.8rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn.small { padding: 0.2rem 0.5rem; font-size: 0.82rem; }
+.btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* the step-2 button when the three files are recognised: it must be pressed */
+.btn.primary.ready {
+  outline: 3px solid var(--ready);
+  outline-offset: 2px;
+  animation: nudge 1.4s ease-in-out 3;
+}
+
+@keyframes nudge {
+  50% { outline-offset: 5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.primary.ready { animation: none; }
+}
+
+#merge_hint.ready { color: var(--ready); font-weight: 600; }
+
+.file { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.4rem 0; }
+.file input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.file:focus-within .btn { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+
+table.compact { border-collapse: collapse; font-size: 0.88rem; margin: 0.4rem 0; }
+table.compact th, table.compact td { text-align: left; padding: 0.18rem 0.8rem 0.18rem 0; border-bottom: 1px solid var(--border); }
+table.compact th { font-weight: 600; }
+table.compact td { white-space: nowrap; }
+table.compact td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 0.75rem; }
+.tabs button {
+  padding: 0.45rem 0.9rem;
+  background: none;
+  color: var(--muted);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
+[hidden] { display: none !important; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; margin-bottom: 0.75rem; }
+.range { min-width: 280px; flex: 1 1 320px; }
+.range input[type="range"] { flex: 1 1 160px; min-width: 120px; }
+.range output { min-width: 6.5rem; font-size: 0.85rem; color: var(--muted); }
+fieldset.axis { border: 0; margin: 0; padding: 0; }
+fieldset.axis legend { padding: 0; font-size: 0.9rem; }
+fieldset.axis label { display: inline-block; margin-right: 0.9rem; }
+
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.card { border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.9rem; background: var(--bg); }
+.card.wide { grid-column: 1 / -1; }
+.card h2 { margin-bottom: 0.3rem; }
+.plot { min-height: 80px; }
+.plot svg.chart { width: 100%; height: auto; display: block; }
+.card ul { margin-bottom: 0; }
+
+#notices .notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+}
+#notices .notice button { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; }
+#status p { margin: 0.2rem 0 0.6rem; }
+#status .warn { color: var(--warn); }
+.error { color: var(--danger); }
+
+/* chart text and marks: classes, so the colours follow the page's theme */
+svg.chart { font: 12px system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+svg.chart text { fill: var(--chart-text); }
+svg.chart .chart-title { font-weight: 700; font-size: 13px; }
+.plot svg.chart .chart-title { display: none; } /* the card's heading says it */
+svg.chart .strip { font-weight: 700; }
+svg.chart .chart-caption { font-size: 11px; }
+svg.chart .gridline { stroke: var(--chart-grid); stroke-width: 1; }
+svg.chart .line-me { stroke: var(--c-me); stroke-width: 1.6; }
+svg.chart .pt-me { fill: var(--c-me); }
+svg.chart .pt-me.soft { opacity: 0.4; }
+svg.chart .pt-feeder { fill: var(--c-feeder); opacity: 0.85; }
+svg.chart .diamond { fill: var(--c-feeder); }
+svg.chart .box { stroke: var(--c-me); stroke-width: 1.4; fill: none; }
+svg.chart .box.thick { stroke-width: 3; }
+svg.chart .bar { fill: var(--c-me); opacity: 0.75; }
+svg.chart .mark { stroke: var(--c-feeder); stroke-width: 1.5; stroke-dasharray: 6 4; }
+svg.chart text.mark-label { fill: var(--c-feeder); font-size: 11px; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
