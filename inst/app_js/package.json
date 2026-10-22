@@ -1,0 +1,6 @@
+{
+  "name": "rallyr-app",
+  "private": true,
+  "type": "module",
+  "description": "The rallyr browser app: plain JavaScript, no dependencies. This file only tells Node that the .js files are ES modules; browsers ignore it."
+}

@@ -7,9 +7,10 @@
 // dedicated workers and the service worker included). It fails if any request
 // goes to an origin other than the local server (data: and blob: URLs are
 // in-page). For the app it waits until a chart has been drawn, then drives it:
-// it uploads the synthetic sample bundle and merges one of its sessions again
-// (the report must say "unchanged"), so the requests are measured on an app
-// that was used, not only on one that started.
+// it uploads the synthetic sample bundle, types the player's name, drops the
+// three files of one session of that bundle and adds them (the report must say
+// "unchanged"), and downloads the updated bundle, so the requests are measured
+// on an app that was used, not only on one that started.
 //
 // Three things make a request leave visible and harmless at once:
 //  * Chromium is started with a host-resolver rule that makes every name other
@@ -23,22 +24,23 @@
 //    sets it, but it is experimental and Chromium-only: without it a service
 //    worker's requests would not be seen at all. The positive control below
 //    proves it works, by having a service worker call an outside origin.
+//    (The app has no service worker and no worker; the check still watches for
+//    one, and the pkgdown pages of the site are opened too.)
 //
-// --fixture: the folder is a test page (tests/fixtures/outside-requests), not
+// --fixture: the folder is a test page (tools/fixtures/outside-requests), not
 // the site. Only "/" is opened and no chart is awaited. CI runs the check this
 // way expecting exit 1 AND the three outside requests (page, worker, service
 // worker) named in the output: a positive control, so a green run on the real
 // site means the check could have gone red.
 //
-// Exit codes: 0 = every request was local and the app drew its charts and took
-// an upload and a merge; 1 = a request left the site; 3 = indeterminate (the
-// app did not draw a chart or could not be driven in time, or the browser could
-// not start): the absence of requests means nothing then. Usage errors exit 2.
+// Exit codes: 0 = every request was local and the app drew its charts, took an
+// upload, a merge and a download; 1 = a request left the site; 3 =
+// indeterminate (the app did not draw a chart or could not be driven in time, or
+// the browser could not start): the absence of requests means nothing then.
+// Usage errors exit 2.
 //
-// This is the check that covers the vendored runtime (Shinylive, WebAssembly
-// R) that tools/check_site_privacy.R cannot scan, and the workers a <meta>
-// policy does not bind. It runs in CI; it needs `npm install playwright` and a
-// Chromium (`npx playwright install chromium`).
+// It runs in CI; it needs `npm install playwright` and a Chromium
+// (`npx playwright install chromium`).
 
 import http from "node:http";
 import fs from "node:fs";
@@ -60,7 +62,7 @@ if (!siteDir || !fs.existsSync(siteDir)) {
 const root = path.resolve(siteDir);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sampleBundle = path.resolve(here, "..", "inst", "extdata", "synthetic_sample_bundle.json.gz");
-const timeoutMs = Number(process.env.APP_TIMEOUT_MS || 300000);
+const timeoutMs = Number(process.env.APP_TIMEOUT_MS || 60000);
 
 const types = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
@@ -130,47 +132,53 @@ try {
   let drawn = fixture;   // a fixture has no app to draw
   let driven = fixture;
   if (!fixture) {
-    // The app: wait for the first chart (an <img> inside the plot output, in any frame).
+    // The app: wait for the first chart (an <svg> inside the trend chart's box).
     step = "waiting for the app's first chart";
     const page = await context.newPage();
     watch(page);
+    const t0 = Date.now();
     await page.goto(base + "/app/", { waitUntil: "load" });
-    const deadline = Date.now() + timeoutMs;
-    const appFrame = async (selector) => {
-      for (const f of page.frames()) {
-        try { if (await f.locator(selector).count() > 0) return f; } catch { /* frame navigating */ }
-      }
-      return null;
-    };
-    drawn = false;
-    while (Date.now() < deadline && !drawn) {
-      drawn = (await appFrame("#plot_trend img")) !== null;
-      if (!drawn) await page.waitForTimeout(1000);
-    }
+    try {
+      await page.waitForSelector("#plot_trend svg", { timeout: timeoutMs });
+      drawn = true;
+      console.log(`First chart drawn ${Date.now() - t0} ms after the page was requested.`);
+    } catch { drawn = false; }
 
     if (drawn) {
-      // Use the app: upload the sample bundle, then merge one of its sessions again.
-      const waitText = async (f, sel, re, label) => {
+      // Use the app: upload the sample bundle, name the player, add one of its
+      // sessions again, then download the bundle.
+      // Polled from here, not with page.waitForFunction(): that evaluates a
+      // string in the page, which the page's policy (no eval) rightly refuses.
+      const until = async (test, label) => {
         step = label;
-        const t0 = Date.now();
-        while (Date.now() - t0 < 120000) {
-          try { if (re.test(await f.locator(sel).innerText({ timeout: 2000 }))) return; } catch { /* not there yet */ }
-          await page.waitForTimeout(1000);
+        const t1 = Date.now();
+        while (Date.now() - t1 < 30000) {
+          try { if (await test()) return; } catch { /* not there yet */ }
+          await page.waitForTimeout(100);
         }
         throw new Error(`timed out ${label}`);
       };
+      const waitText = (sel, re, label) => until(async () => re.test(await page.locator(sel).innerText({ timeout: 2000 })), label);
       try {
         if (!fs.existsSync(sampleBundle)) throw new Error(`the sample bundle is missing: ${sampleBundle}`);
-        const f = await appFrame("#bundle_file");
-        if (!f) throw new Error("the app's upload control was not found");
         step = "uploading the sample bundle";
-        await f.locator("#bundle_file").setInputFiles(sampleBundle);
-        await waitText(f, "#merge_msg", /Loaded a bundle of \d+ session/, "waiting for the bundle upload to be read");
+        await page.locator("#bundle_file").setInputFiles(sampleBundle);
+        await waitText("#merge_msg", /Loaded a bundle of \d+ session/, "waiting for the bundle upload to be read");
+        step = "typing the player's name";
+        await page.locator("#me").fill("Sample Player");
+        await until(async () => (await page.locator("#plot_rally svg text").count()) > 0, "waiting for the charts of the named player");
         step = "dropping a session's three files";
-        await f.locator("#raw_files").setInputFiles(sampleSessionFiles());
-        await waitText(f, "#raw_detect", /shots/, "waiting for the dropped files to be recognised");
-        await f.locator("#merge").click();
-        await waitText(f, "#merge_summary", /Unchanged\s*1/, "waiting for the merge report to say 'unchanged'");
+        await page.locator("#raw_files").setInputFiles(sampleSessionFiles());
+        await waitText("#raw_detect", /shots/, "waiting for the dropped files to be recognised");
+        await until(() => page.locator("#merge").isEnabled(), "waiting for the Add session button to become available");
+        await waitText("#merge_hint", /Press/, "waiting for the page to say the button must be pressed");
+        await page.locator("#merge").click();
+        await waitText("#merge_summary", /Unchanged\s*1/, "waiting for the merge report to say 'unchanged'");
+        step = "downloading the updated bundle";
+        const [download] = await Promise.all([page.waitForEvent("download", { timeout: 30000 }), page.locator("#download").click()]);
+        if (!/^rallyr_bundle_\d{8}\.json\.gz$/.test(download.suggestedFilename())) throw new Error(`unexpected download name ${download.suggestedFilename()}`);
+        const saved = await download.path();
+        if (!saved || fs.statSync(saved).size < 1000) throw new Error("the downloaded bundle is empty");
         driven = true;
       } catch (e) {
         console.error("Could not drive the app while " + step + ": " + (e && e.message ? e.message : e));
@@ -204,10 +212,10 @@ try {
     console.error(`INDETERMINATE: the app did not draw a chart within ${timeoutMs} ms, so the request list says nothing about a running app.`);
     status = 3;
   } else if (!driven) {
-    console.error("INDETERMINATE: the app drew its charts but could not be driven through an upload and a merge, so those paths were not observed.");
+    console.error("INDETERMINATE: the app drew its charts but could not be driven through an upload, a merge and a download, so those paths were not observed.");
     status = 3;
   } else {
-    console.log("PASS: the app drew its charts, took an upload and a merge, and every request was to this site.");
+    console.log("PASS: the app drew its charts, took an upload, a merge and a download, and every request was to this site.");
   }
 } catch (e) {
   console.error(`INDETERMINATE (${step}): ` + (e && e.message ? e.message : e));

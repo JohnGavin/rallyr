@@ -13,10 +13,10 @@ load_checker <- function() {
 }
 
 assemble_app <- function(dir) {
-  skip_if_not(file.exists(tools_file("build_app.R")), "tools/ is not part of the installed package")
+  skip_if_not(file.exists(tools_file("assemble_shiny_app.R")), "tools/ is not part of the installed package")
   out <- suppressWarnings(system2(
     file.path(R.home("bin"), "Rscript"),
-    c(shQuote(normalizePath(tools_file("build_app.R"))), "--assemble-only", shQuote(paste0("--app-dir=", dir))),
+    c(shQuote(normalizePath(tools_file("assemble_shiny_app.R"))), shQuote(paste0("--app-dir=", dir))),
     stdout = TRUE, stderr = TRUE
   ))
   expect_true(file.exists(file.path(dir, "app.R")), info = paste(out, collapse = "\n"))

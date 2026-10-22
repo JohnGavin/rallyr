@@ -116,8 +116,12 @@ matches <- parse_swingvision(pasted_text)
 Documentation site: <https://johngavin.github.io/rallyr/> (reference, news and
 a vignette that draws the core charts from the synthetic sample).
 
-The app at <https://johngavin.github.io/rallyr/app/> runs R in your browser
-(Shinylive / WebAssembly):
+The app at <https://johngavin.github.io/rallyr/app/> is plain JavaScript that
+runs in your browser: no R, no WebAssembly, no framework. It repeats this
+package's calculations function by function (the R package is the reference),
+and a test on every build checks that both give the same numbers. A bundle
+saved by the page opens in R, and the other way round. Its first chart appears
+in a fraction of a second.
 
 1. Load your **bundle**: one gzip-compressed JSON file of the raw API payloads
    of your past sessions (a synthetic sample is shown until you do).
@@ -125,12 +129,15 @@ The app at <https://johngavin.github.io/rallyr/app/> runs R in your browser
    as a JSON file (the vendor's server does not let a web page read them
    directly) and drop the files in. The kind of each file is detected from its
    content.
-3. Enter your name, add the session (same `match_id`: the newer copy
-   replaces the old, and a merge report says what happened) and download the
-   updated bundle.
-4. The charts are recomputed in the browser with rallyr's own functions. A
-   choice above the trend chart puts the oldest session on the left (the
-   default) or the newest.
+3. Enter your name. When the three files are recognised, press "Add session
+   to bundle" (same `match_id`: the newer copy replaces the old, and a merge
+   report says what happened), then download the updated bundle.
+4. The charts are recomputed in the browser by the JavaScript port of rallyr's
+   functions. A choice above the trend chart puts the oldest session on the
+   left (the default) or the newest.
+
+The earlier Shiny version of the app still runs in R, on your own computer:
+`shiny::runApp(system.file("app", package = "rallyr"))`.
 
 To try the steps without data of your own, two synthetic sets of sample files
 ship with the package and are offered for download on the app page ("Try it
@@ -154,8 +161,9 @@ Privacy: files you choose are read in the browser and are not uploaded. The
 app makes no requests to other sites (no analytics, proxy, fonts or scripts
 from elsewhere). Two checks run on every build: a scan of the code we ship,
 and a real-browser run that fails on any request to another origin. The page
-also carries a Content-Security-Policy `<meta>` tag, but that tag does not bind
-the Shinylive frame or the workers: the browser check is the real guarantee.
+also carries a Content-Security-Policy `<meta>` tag that allows this site only
+(no inline or `eval`-ed script, no workers); the browser check is the
+guarantee, because a policy tag is one line of defence, not a proof.
 
 In R, the same bundle can be built and read without the app:
 

@@ -25,10 +25,17 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
+      # Node is in the Nix shell (default.R, system_pkgs). The tests that run the
+      # JavaScript app against the R package must not be skipped here: with
+      # RALLYR_REQUIRE_NODE a missing Node is an error, not a skip.
       - name: Run testthat suite
+        env:
+          RALLYR_REQUIRE_NODE: "true"
         run: |
           nix-shell default.nix --run "Rscript -e 'devtools::test(stop_on_failure = TRUE)'"
 
       - name: R CMD check
+        env:
+          RALLYR_REQUIRE_NODE: "true"
         run: |
           nix-shell default.nix --run "Rscript -e 'rcmdcheck::rcmdcheck(args = \"--no-manual\", error_on = \"error\")'"

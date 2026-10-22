@@ -12,12 +12,12 @@ test_that("the app works in a clean process from the assembled folder (bundled c
   skip_if_not_installed("shiny")
   skip_if_not_installed("bslib")
   skip_if_not_installed("ggplot2")
-  build <- test_path("..", "..", "tools", "build_app.R")
+  build <- test_path("..", "..", "tools", "assemble_shiny_app.R")
   skip_if_not(file.exists(build), "tools/ is not part of the installed package")
   rscript <- file.path(R.home("bin"), "Rscript")
   app <- withr::local_tempdir()
   out <- suppressWarnings(system2(
-    rscript, c(shQuote(normalizePath(build)), "--assemble-only", shQuote(paste0("--app-dir=", app))),
+    rscript, c(shQuote(normalizePath(build)), shQuote(paste0("--app-dir=", app))),
     stdout = TRUE, stderr = TRUE
   ))
   expect_true(file.exists(file.path(app, "pkg_R", "rallyr_app_sources.R")), info = paste(out, collapse = "\n"))
