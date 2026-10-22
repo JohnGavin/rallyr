@@ -148,14 +148,16 @@ bundle_write(bundle, "my_sessions.json.gz")
 Merging a newer fetch of the same session replaces the older copy
 (`bundle_merge()`), and `bundle_to_tables()` accepts either player as "me".
 
-In the browser app you can do the same without R:
+The browser app is plain JavaScript that repeats these functions' calculations
+(the R package is the reference, and a test checks both give the same
+numbers); with it you can do the same without R:
 
 - load your bundle (step 1);
 - paste the share link and open the three links it shows, saving each as a
   JSON file (the vendor's server does not let a web page read them
   directly), then drop the files (step 2);
-- enter your name (step 3), add the session, and download the updated
-  bundle (step 4).
+- enter your name (step 3); once the three files are recognised, press "Add
+  session to bundle" and download the updated bundle (step 4).
 
 ## Privacy
 
@@ -164,11 +166,11 @@ In the browser app you can do the same without R:
 - The app makes no requests to other sites: no analytics, no proxy, no
   fonts or scripts from elsewhere. A build check scans the code we ship and a
   browser check lists every request the loaded app makes.
-- The page carries a Content-Security-Policy `<meta>` tag, but that tag does
-  not bind the Shinylive frame or the workers, so it is a second line, not
-  the guarantee. The guarantee is the browser check: it loads the built site
-  in a real browser that can reach no other site, uses the app (an upload and
-  a merge), and fails on any request that leaves, workers and the service
+- The page carries a Content-Security-Policy `<meta>` tag that allows this
+  site only, but a policy tag is a second line, not the guarantee. The
+  guarantee is the browser check: it loads the built site in a real browser
+  that can reach no other site, uses the app (an upload, a name, a merge and a
+  download), and fails on any request that leaves, workers and the service
   worker included.
 - A bundle holds raw session data. Keep it private.
 

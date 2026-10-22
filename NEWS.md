@@ -1,3 +1,50 @@
+# rallyr 0.2.0
+
+## The website's app is now plain JavaScript
+
+The app at `/app/` no longer runs R in the browser (Shinylive, WebAssembly). It
+is plain JavaScript (`inst/app_js/`): no framework, no npm package, nothing
+fetched from another site. The page shows its first chart in about 0.2 s on a
+local server, where the Shinylive build took about 56 s (and about 150 s before
+0.1.0's speed-ups), and a bundle you choose is read in tens of milliseconds.
+
+* The R package stays the reference. The JavaScript repeats the functions the
+  app uses, one by one and named after them: `bundle_read()`/`bundle_write()`
+  (the same file format, so a bundle written by the page opens in R and the
+  other way round), `bundle_payload_kind()`, `bundle_add_raw()` and the merge
+  report, `sv_token()`, `sv_parse_match()`/`sv_parse_shots()`,
+  `bundle_to_tables()`, `bundle_derived()` (segments, rallies, data-quality
+  corrections, net clearance, stroke quality, session metrics) and the numbers
+  each chart shows.
+* A test compares the two. `data-raw/js_parity_fixtures.R` runs the R functions
+  on the synthetic sample, on the sample with the extra session added, on the
+  sample seen from the feeder's side, on a bundle built to reach the rules the
+  sample never triggers, and on a session built to sit on the edge of every
+  threshold; `tests/js/` (run with `node --test`) checks that the JavaScript
+  gives the same tables and derived data: numbers within a relative 1e-9,
+  times within 1e-5 s, text, dates and missing values exactly.
+  `tests/testthat/test-js_app.R` runs them, and checks that a bundle written by
+  one side reads on the other. Node is now part of the Nix environment
+  (`default.R`).
+* Step 2 of the page now says when it is ready: once the match, stats and shots
+  files are recognised, "Add session to bundle" is enabled and highlighted and
+  the page says to press it. Nothing is merged until you do.
+* The page's Content-Security-Policy is tighter (no inline or `eval`-ed script
+  or style, no workers, no WebAssembly) and the privacy checks run against the
+  new app: `tools/check_site_privacy.R` scans it, `tools/check_app_requests.mjs`
+  drives it through an upload, a name, a merge and a download in a real
+  browser that can reach no other site.
+* `tools/build_app.R` builds the site's `/app/` (it copies `inst/app_js/` and
+  writes the sample data into a script, so the page makes no request for them).
+  Shinylive is no longer used. The Shiny app, `inst/app/app.R`, still runs in
+  R: `shiny::runApp(system.file("app", package = "rallyr"))`. Its assembly for
+  the tests is now `tools/assemble_shiny_app.R`.
+* Differences from the R functions: a session whose shots lack a start or end
+  time, or whose match has no `recording_duration`, is reported as "could not
+  be parsed" (with a different reason text); a byte-order mark at the start of
+  a JSON file is ignored; the names in `bundle_players()` with equal counts are
+  ordered by English collation.
+
 # rallyr 0.1.0
 
 First public release (version bumped for the first deployed site).

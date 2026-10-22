@@ -1,15 +1,19 @@
-# rallyr browser app: upload past sessions, add the latest, download, see charts.
+# rallyr app (the Shiny version): upload past sessions, add the latest,
+# download, see charts.
 #
-# Everything runs in the browser (Shinylive / WebAssembly R). Files you pick
-# are read locally and never uploaded; the app makes no requests to other
-# sites. See the "About and privacy" tab.
+# The website's app (https://johngavin.github.io/rallyr/app/) is now plain
+# JavaScript, in inst/app_js/; it repeats this package's calculations and a test
+# checks that both give the same numbers. This Shiny version runs in R, on your
+# own computer: files you pick are read locally and never uploaded, and the app
+# makes no requests to other sites. See the "About and privacy" tab.
 #
 # Two ways to run it:
-#  * in the browser: the build (tools/build_app.R) copies the package code the
-#    app needs into pkg_R/ and the sample bundle into data/, and Shinylive
-#    exports the folder;
-#  * in R, for development: shiny::runApp(system.file("app", package = "rallyr"))
-#    uses the installed package instead.
+#  * in R: shiny::runApp(system.file("app", package = "rallyr")) uses the
+#    installed package;
+#  * from bundled code: tools/assemble_shiny_app.R copies the package code the
+#    app needs into pkg_R/ and the sample bundle into data/. The tests run the
+#    app from that folder in a clean process and check that code for any way to
+#    reach the network.
 
 # Only the UI packages are attached. The others (dplyr, jsonlite, cli, tibble,
 # rlang) are used through `pkg::name`, so their functions cannot mask shiny's
@@ -22,8 +26,8 @@ library(ggplot2)
 
 app_dir <- shiny::getShinyOption("appDir", default = getwd())
 bundled_sources <- file.path(app_dir, "pkg_R", "rallyr_app_sources.R")
-# The package name is held in a variable on purpose: the browser runtime scans
-# the app's code for package names and would otherwise try to download a
+# The package name is held in a variable on purpose: a browser-side R runtime
+# scans an app's code for package names and would otherwise try to download a
 # WebAssembly build of rallyr itself (one request to the package repository).
 rallyr_pkg <- "rallyr"
 if (file.exists(bundled_sources)) {
@@ -53,7 +57,7 @@ sample_session_files <- c(
 )
 
 # The sample's tables and derived data, computed once when the app was built
-# (tools/build_app.R) so the page does not parse six sessions in the browser.
+# (tools/assemble_shiny_app.R) so the app does not parse six sessions at start.
 # NULL when running from the installed package (development): the sample is then
 # derived live, like any bundle the visitor supplies.
 sample_pre <- local({
@@ -170,7 +174,7 @@ ui <- bslib::page_sidebar(
     bslib::nav_panel(
       "About and privacy",
       tags$ul(
-        tags$li("This page runs R in your browser (WebAssembly). Files you choose are read here and are not uploaded."),
+        tags$li("This app runs R on your own computer. Files you choose are read here and are not uploaded."),
         tags$li("It makes no requests to other sites: no analytics, no proxy, no fonts or scripts from elsewhere."),
         tags$li("A browser check on every build confirms this (the page's own policy tag does not cover the workers)."),
         tags$li("The only links that leave this page are the API links in step 2, and only if you click them."),
