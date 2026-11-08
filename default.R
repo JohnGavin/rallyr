@@ -16,9 +16,11 @@ r_pkgs <- c(
   unique() |>
   sort()
 
-# Pinned date: bump only deliberately.
+# Pinned date: bump only deliberately. Pick a date the rstats-on-nix binary cache
+# covers (check with rix_cache_coverage.sh); otherwise every CI run compiles
+# the packages from source (~26 min).
 rix(
-  date = "2026-02-02",
+  date = "2026-10-13",
   project_path = ".",
   overwrite = TRUE,
   r_pkgs = r_pkgs,
