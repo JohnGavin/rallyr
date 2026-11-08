@@ -93,13 +93,22 @@ test_that("dq_params can be passed through to the API (#8)", {
 # the fix is to bump rallyr_schema_version() (and the package minor version),
 # add a NEWS.md entry and add the new version's fingerprint here. Bumping the
 # version without a fingerprint fails the first expectation.
+#
+# The fingerprint is a base-R MD5 of the pasted spec, NOT rlang::hash(): the
+# output of rlang::hash() changed between rlang 1.1.7 and 1.3.0 for the same
+# input (rlang::hash("abc") differs), which made this test fail on a rix date
+# bump with no schema change. MD5 of the bytes is stable across versions.
 schema_fingerprint <- function() {
   s <- rallyr_api_schema()
-  rlang::hash(paste(s$fn, s$column, s$type, sep = ":", collapse = "\n"))
+  txt <- paste(s$fn, s$column, s$type, sep = ":", collapse = "\n")
+  f <- tempfile()
+  on.exit(unlink(f), add = TRUE)
+  writeBin(charToRaw(txt), f)
+  unname(tools::md5sum(f))
 }
 
 test_that("the schema spec is frozen per schema version (#8)", {
-  frozen <- c("0.1" = "d640eb333233657cd4c01821860b918d")
+  frozen <- c("0.1" = "c964f6280f43ec5a0240fccef64f5ea2")
   v <- rallyr_schema_version()
   expect_true(v %in% names(frozen), label = paste("a fingerprint for schema version", v))
   expect_identical(
